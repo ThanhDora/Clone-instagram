@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/Context/ThemeContext";
-import ProtectedRoute from "./Components/ProtectedRoute";
+// import ProtectedRoute from "./Components/ProtectedRoute";
 import MainLayout from "./Layout/MainLayout";
 import Login from "./Features/Auth/Login";
 import Register from "./Features/Auth/Register";
@@ -22,9 +22,9 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route
             element={
-              <ProtectedRoute>
-                <MainLayout />
-              </ProtectedRoute>
+              // <ProtectedRoute>
+              <MainLayout />
+              // </ProtectedRoute>
             }
           >
             <Route path="/" element={<Home />} />

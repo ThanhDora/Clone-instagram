@@ -23,3 +23,7 @@ export type TAuthError = {
   statusCode?: number;
   errors?: Record<string, string[]>;
 };
+
+export type TAvatar = {
+  image: string;
+};

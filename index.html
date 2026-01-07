@@ -6,6 +6,21 @@
   <link rel="icon" type="image/svg+xml" href="/instagram.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>instagram</title>
+  <script>
+    // Apply theme immediately to prevent flash
+    (function() {
+      const theme = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = theme === 'dark' || (!theme && prefersDark);
+      
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      }
+      
+      // Set background color immediately
+      document.documentElement.style.backgroundColor = isDark ? 'hsl(209, 25%, 6%)' : 'hsl(0, 0%, 100%)';
+    })();
+  </script>
 </head>
 
 <body>

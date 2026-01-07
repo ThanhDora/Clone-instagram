@@ -243,7 +243,7 @@ const Example = () => {
             to="/login"
             className="font-semibold text-primary hover:underline"
           >
-            Log in
+            <span className="text-(--primary) cursor-pointer">Log in</span>
           </Link>
         </p>
       </div>
