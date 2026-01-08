@@ -6,5 +6,5 @@ export interface Story {
   image: string;
   timestamp: string;
   isViewed?: boolean;
+  title?: string;
 }
-

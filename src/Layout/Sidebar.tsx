@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { useState } from "react";
 import {
   Home,
   Search,
@@ -16,6 +17,8 @@ import {
   AlertCircle,
   Menu,
   Flower,
+  ImageIcon,
+  Sparkles,
 } from "lucide-react";
 import {
   TbApps,
@@ -28,6 +31,13 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/useTheme";
 import { mockUsers, getUserById } from "@/assets/db";
 import { Popover, PopoverContent, PopoverTrigger } from "@/Components/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/Components/ui/dropdown-menu";
+import { Dialog, DialogContent } from "@/Components/ui/dialog";
 
 const navigation = [
   { name: "Home", href: "/", icon: Home },
@@ -36,13 +46,18 @@ const navigation = [
   { name: "Reels", href: "/reels", icon: Video },
   { name: "Messages", href: "/messages", icon: MessageCircle },
   { name: "Notifications", href: "/notifications", icon: Heart },
-  { name: "Create", href: "/create", icon: PlusSquare },
+  { name: "Create", href: null, icon: PlusSquare, isDialog: true },
   { name: "Profile", href: "/profile", icon: User, isProfile: true },
 ];
 
 export default function Sidebar() {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
+  const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
+
+  const handlePostClick = () => {
+    setIsPostDialogOpen(true);
+  };
 
   // Get current user avatar
   const currentUserStr = localStorage.getItem("user");
@@ -77,28 +92,63 @@ export default function Sidebar() {
       </div>
       <nav className="flex-1 space-y-2">
         {navigation.map((item) => {
-          const isActive = location.pathname === item.href;
+          const isActive = item.href ? location.pathname === item.href : false;
           const isProfile = item.name === "Profile";
+          const isDialog = item.isDialog;
+
+          if (isDialog) {
+            return (
+              <DropdownMenu key={item.name}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-base font-medium transition-all duration-200 text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.02] active:scale-[0.98]"
+                    )}
+                  >
+                    <item.icon className="h-6 w-6 transition-transform duration-200 hover:scale-110" />
+                    <span>{item.name}</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-56 bg-card border-border backdrop-blur-0"
+                  style={{ backgroundColor: "hsl(var(--card))" }}
+                  align="start"
+                >
+                  <DropdownMenuItem
+                    onClick={handlePostClick}
+                    className="flex items-center gap-2 cursor-pointer text-foreground"
+                  >
+                    <ImageIcon className="h-5 w-5" />
+                    <span>Post</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="flex items-center gap-2 cursor-pointer text-foreground">
+                    <Sparkles className="h-5 w-5" />
+                    <span>AI</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            );
+          }
 
           return (
             <Link
               key={item.name}
-              to={item.href}
+              to={item.href || "/"}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium transition-all duration-200",
                 isActive
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.02] active:scale-[0.98]"
               )}
             >
               {isProfile && currentUserAvatar ? (
                 <img
                   src={currentUserAvatar}
                   alt="Profile"
-                  className="h-6 w-6 rounded-full object-cover"
+                  className="h-6 w-6 rounded-full object-cover transition-transform duration-200 hover:scale-110"
                 />
               ) : (
-                <item.icon className="h-6 w-6" />
+                <item.icon className="h-6 w-6 transition-transform duration-200 hover:scale-110" />
               )}
               <span>{item.name}</span>
             </Link>
@@ -213,6 +263,23 @@ export default function Sidebar() {
           </PopoverContent>
         </Popover>
       </div>
+
+      <Dialog open={isPostDialogOpen} onOpenChange={setIsPostDialogOpen}>
+        <DialogContent
+          className="sm:max-w-4xl max-h-[90vh] bg-card backdrop-blur-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-bottom-4 duration-300 ease-out"
+          style={{ backgroundColor: "hsl(var(--card))" }}
+          showCloseButton={false}
+        >
+          <div className="text-center py-4 border-b border-border">
+            <h2 className="text-lg font-semibold">Create new post</h2>
+          </div>
+          <div className="py-8">
+            <div className="flex flex-col items-center justify-center gap-4 min-h-[400px]">
+              <p className="text-muted-foreground">Post content here</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

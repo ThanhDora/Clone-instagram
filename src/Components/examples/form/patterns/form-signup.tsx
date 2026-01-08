@@ -227,7 +227,7 @@ const Example = () => {
 
             {/* Sign up Button */}
             <Button
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold"
+              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold bg-(--primary-foreground) hover:bg-(--primary-hover) cursor-pointer"
               type="submit"
               disabled={isLoading || !form.formState.isValid}
             >

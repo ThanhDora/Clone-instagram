@@ -1,5 +1,7 @@
 import Avatar from "./Avatar";
 import { mockUsers, getUserById } from "@/assets/db";
+import Switch from "./Switch";
+import { Link } from "react-router-dom";
 
 export default function Profile() {
   // Get current user from localStorage or use first mock user as default
@@ -25,17 +27,17 @@ export default function Profile() {
   return (
     <div className="space-y-4">
       <div className="rounded-lg bg-card p-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Avatar image={currentUser.avatar || ""} />
-          <div className="flex-1">
-            <h3 className="font-semibold">{currentUser.username}</h3>
-            <p className="text-sm text-muted-foreground">
+          <div className="flex-1 min-w-0">
+            <Link to="/profile" className="font-semibold truncate">
+              {currentUser.username}
+            </Link>
+            <p className="text-sm text-muted-foreground truncate">
               {currentUser.fullName}
             </p>
           </div>
-          <button className="text-xs font-semibold text-(--primary) hover:text-(--primary)/80 cursor-pointer hover:underline hover:opacity-100 transition-opacity">
-            Switch
-          </button>
+          <Switch />
         </div>
       </div>
       <div className="rounded-lg bg-card p-4">

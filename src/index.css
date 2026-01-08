@@ -5,6 +5,9 @@
   --primary-blues: #0095f6;
   --primary-hover: #5e77e2;
   --primary-foreground: #3746b4;
+  --primary-background: #25292e;
+  --primary-background-hover: #b8b9ba63;
+  --secondary-background: #212328;
   @import url("https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500;600;700&display=swap");
 }
 
@@ -62,12 +65,53 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
-}
 
+  .active-tab {
+    border-bottom: 2px solid hsl(var(--foreground));
+    color: hsl(var(--foreground));
+  }
+
+  [data-slot="tabs-trigger"][data-state="active"] {
+    color: white;
+  }
+
+  [data-slot="tabs-trigger"][data-state="active"] svg {
+    color: white;
+  }
+
+  [data-slot="tabs-trigger"][data-state="inactive"] svg {
+    color: #9ca3af;
+  }
+
+  [data-slot="tabs-trigger"][data-state="active"] {
+    padding-bottom: 0.5rem;
+  }
+
+  [data-slot="tabs-trigger"][data-state="active"]::after {
+    content: "";
+    position: absolute;
+    bottom: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4rem;
+    height: 2px;
+    background-color: white;
+  }
+}
 @layer base {
   * {
     border-color: hsl(var(--border));
   }
+
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
