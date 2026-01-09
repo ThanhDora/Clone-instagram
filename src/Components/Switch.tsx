@@ -7,8 +7,10 @@ import { Button } from "@/Components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogTitle,
   DialogTrigger,
 } from "@/Components/ui/dialog";
 import {
@@ -91,9 +93,10 @@ const Example = () => {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md bg-(--secondary-background) text-foreground">
         <DialogHeader>
-          <h1 className="instagram-logo mb-8 text-center text-4xl text-white">
+          <DialogTitle className="instagram-logo mb-8 text-center text-4xl text-white">
             Instagram
-          </h1>
+          </DialogTitle>
+          <DialogDescription className="sr-only">Sign in to your Instagram account</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>

@@ -1,6 +1,7 @@
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/Components/ui/sheet";
@@ -29,6 +30,9 @@ export default function NotificationsSheet() {
           <SheetTitle className="text-left text-xl font-semibold">
             Notifications
           </SheetTitle>
+          <SheetDescription className="sr-only">
+            View your notifications
+          </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto">
           <div className="py-2">

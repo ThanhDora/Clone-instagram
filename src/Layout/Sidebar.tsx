@@ -38,7 +38,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
-import { Dialog, DialogContent } from "@/Components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "@/Components/ui/dialog";
 import { useNotificationsSheet } from "@/Context/NotificationsSheetContext";
 import { useSearchSheet } from "@/Context/SearchSheetContext";
 
@@ -363,9 +368,12 @@ export default function Sidebar() {
           style={{ backgroundColor: "hsl(var(--card))" }}
           showCloseButton={false}
         >
-          <div className="text-center py-4 border-b border-border">
-            <h2 className="text-lg font-semibold">Create new post</h2>
-          </div>
+          <DialogTitle className="text-center py-4 border-b border-border text-lg font-semibold">
+            Create new post
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Create and share a new post
+          </DialogDescription>
           <div className="py-8">
             <div className="flex flex-col items-center justify-center gap-4 min-h-[400px]">
               <p className="text-muted-foreground">Post content here</p>

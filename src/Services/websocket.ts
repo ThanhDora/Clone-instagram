@@ -1,16 +1,17 @@
 import { io, Socket } from "socket.io-client";
 
 type SocketEventMap = {
-  [key: string]: (...args: any[]) => void;
+  [key: string]: (...args: unknown[]) => void;
 };
 
 class WebSocketService {
   private socket: Socket | null = null;
   private url: string;
-  private options: any;
-  private eventHandlers: Map<string, Set<Function>> = new Map();
+  private options: Record<string, unknown>;
+  private eventHandlers: Map<string, Set<(...args: unknown[]) => void>> =
+    new Map();
 
-  constructor(url?: string, options?: any) {
+  constructor(url?: string, options?: Record<string, unknown>) {
     this.url = url || import.meta.env.VITE_WS_URL || "http://localhost:3000";
     this.options = {
       autoConnect: false,
@@ -73,7 +74,10 @@ class WebSocketService {
     }
   }
 
-  on<T extends keyof SocketEventMap>(event: string, handler: SocketEventMap[T]): void {
+  on<T extends keyof SocketEventMap>(
+    event: string,
+    handler: SocketEventMap[T]
+  ): void {
     if (!this.eventHandlers.has(event)) {
       this.eventHandlers.set(event, new Set());
     }
@@ -84,7 +88,10 @@ class WebSocketService {
     }
   }
 
-  off<T extends keyof SocketEventMap>(event: string, handler?: SocketEventMap[T]): void {
+  off<T extends keyof SocketEventMap>(
+    event: string,
+    handler?: SocketEventMap[T]
+  ): void {
     if (handler) {
       this.eventHandlers.get(event)?.delete(handler);
       this.socket?.off(event, handler);
@@ -94,7 +101,7 @@ class WebSocketService {
     }
   }
 
-  emit(event: string, ...args: any[]): void {
+  emit(event: string, ...args: unknown[]): void {
     if (this.socket?.connected) {
       this.socket.emit(event, ...args);
     }
@@ -117,4 +124,3 @@ const websocketService = new WebSocketService();
 
 export default websocketService;
 export { WebSocketService };
-

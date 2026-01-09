@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/Components/ui/sheet";
@@ -46,6 +47,9 @@ export default function SearchSheet() {
           <SheetTitle className="text-left text-xl font-semibold">
             Search
           </SheetTitle>
+          <SheetDescription className="sr-only">
+            Search for users by username or name
+          </SheetDescription>
         </SheetHeader>
         <div className="px-4 pt-4 pb-2 border-b border-border">
           <div className="relative">

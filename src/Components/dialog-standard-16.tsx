@@ -7,6 +7,7 @@ import { Button } from "@/Components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -33,6 +34,7 @@ const Example = () => {
       <DialogContent className="p-0 sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6 pb-0">
           <DialogTitle>Edit profile</DialogTitle>
+          <DialogDescription>Update your profile information</DialogDescription>
         </DialogHeader>
         <div className="space-y-6">
           <div className="relative">
