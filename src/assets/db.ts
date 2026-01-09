@@ -6,9 +6,10 @@ import type { Comment } from "@/Type/Comment";
 import type { Story } from "@/Type/Story";
 import type { Message } from "@/Type/Message";
 import type { Conversation } from "@/Type/Conversation";
+import type { Notification } from "@/Type/Notification";
 
 // Re-export types for convenience
-export type { User, Post, Comment, Story, Message, Conversation };
+export type { User, Post, Comment, Story, Message, Conversation, Notification };
 
 // Mock Users
 export const mockUsers: User[] = [
@@ -306,6 +307,161 @@ export const mockConversations: Conversation[] = [
   },
 ];
 
+// Mock Notifications
+export const mockNotifications: Notification[] = [
+  {
+    id: "1",
+    userId: "2",
+    username: "janedoe",
+    avatar: "https://i.pravatar.cc/150?img=5",
+    type: "like",
+    text: "liked your photo",
+    thumbnail: "https://picsum.photos/44/44?random=1",
+    timestamp: "5m",
+    isRead: false,
+  },
+  {
+    id: "2",
+    userId: "3",
+    username: "techguru",
+    avatar: "https://i.pravatar.cc/150?img=12",
+    type: "comment",
+    text: "commented: Amazing shot! 🔥",
+    thumbnail: "https://picsum.photos/44/44?random=2",
+    timestamp: "12m",
+    isRead: false,
+  },
+  {
+    id: "3",
+    userId: "4",
+    username: "foodie",
+    avatar: "https://i.pravatar.cc/150?img=8",
+    type: "follow",
+    text: "started following you",
+    timestamp: "1h",
+    isRead: false,
+  },
+  {
+    id: "4",
+    userId: "5",
+    username: "traveler",
+    avatar: "https://i.pravatar.cc/150?img=15",
+    type: "like",
+    text: "liked your photo",
+    thumbnail: "https://picsum.photos/44/44?random=3",
+    timestamp: "2h",
+    isRead: true,
+  },
+  {
+    id: "5",
+    userId: "2",
+    username: "janedoe",
+    avatar: "https://i.pravatar.cc/150?img=5",
+    type: "comment",
+    text: "commented: Love this!",
+    thumbnail: "https://picsum.photos/44/44?random=4",
+    timestamp: "3h",
+    isRead: true,
+  },
+  {
+    id: "6",
+    userId: "3",
+    username: "techguru",
+    avatar: "https://i.pravatar.cc/150?img=12",
+    type: "like",
+    text: "liked your photo",
+    thumbnail: "https://picsum.photos/44/44?random=5",
+    timestamp: "5h",
+    isRead: true,
+  },
+  {
+    id: "7",
+    userId: "4",
+    username: "foodie",
+    avatar: "https://i.pravatar.cc/150?img=8",
+    type: "mention",
+    text: "mentioned you in a comment",
+    thumbnail: "https://picsum.photos/44/44?random=6",
+    timestamp: "1d",
+    isRead: true,
+  },
+  {
+    id: "8",
+    userId: "5",
+    username: "traveler",
+    avatar: "https://i.pravatar.cc/150?img=15",
+    type: "follow",
+    text: "started following you",
+    timestamp: "1d",
+    isRead: true,
+  },
+  {
+    id: "9",
+    userId: "2",
+    username: "janedoe",
+    avatar: "https://i.pravatar.cc/150?img=5",
+    type: "like",
+    text: "liked your photo",
+    thumbnail: "https://picsum.photos/44/44?random=7",
+    timestamp: "2d",
+    isRead: true,
+  },
+  {
+    id: "10",
+    userId: "3",
+    username: "techguru",
+    avatar: "https://i.pravatar.cc/150?img=12",
+    type: "comment",
+    text: "commented: Great work!",
+    thumbnail: "https://picsum.photos/44/44?random=8",
+    timestamp: "2d",
+    isRead: true,
+  },
+  {
+    id: "11",
+    userId: "4",
+    username: "foodie",
+    avatar: "https://i.pravatar.cc/150?img=8",
+    type: "like",
+    text: "liked your photo",
+    thumbnail: "https://picsum.photos/44/44?random=9",
+    timestamp: "3d",
+    isRead: true,
+  },
+  {
+    id: "12",
+    userId: "5",
+    username: "traveler",
+    avatar: "https://i.pravatar.cc/150?img=15",
+    type: "follow",
+    text: "started following you",
+    timestamp: "3d",
+    isRead: true,
+  },
+  {
+    id: "13",
+    userId: "2",
+    username: "janedoe",
+    avatar: "https://i.pravatar.cc/150?img=5",
+    type: "like",
+    text: "liked your photo",
+    thumbnail: "https://picsum.photos/44/44?random=10",
+    timestamp: "4d",
+    isRead: true,
+  },
+  {
+    id: "14",
+    userId: "3",
+    username: "techguru",
+    avatar: "https://i.pravatar.cc/150?img=12",
+    type: "comment",
+    text: "commented: Nice!",
+    thumbnail: "https://picsum.photos/44/44?random=11",
+    timestamp: "5d",
+    isRead: true,
+  },
+];
+
 // Helper functions
 export const getUserById = (id: string): User | undefined => {
   return mockUsers.find((user) => user.id === id);
@@ -337,4 +493,12 @@ export const getMessagesByConversationId = (
   return mockMessages.filter(
     (message) => message.conversationId === conversationId
   );
+};
+
+export const getNotifications = (): Notification[] => {
+  return mockNotifications;
+};
+
+export const getUnreadNotificationsCount = (): number => {
+  return mockNotifications.filter((notification) => !notification.isRead).length;
 };

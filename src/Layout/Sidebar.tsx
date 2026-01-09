@@ -19,6 +19,7 @@ import {
   Flower,
   ImageIcon,
   Sparkles,
+  Instagram,
 } from "lucide-react";
 import {
   TbApps,
@@ -38,14 +39,16 @@ import {
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
 import { Dialog, DialogContent } from "@/Components/ui/dialog";
+import { useNotificationsSheet } from "@/Context/NotificationsSheetContext";
+import { useSearchSheet } from "@/Context/SearchSheetContext";
 
 const navigation = [
   { name: "Home", href: "/", icon: Home },
-  { name: "Search", href: "/search", icon: Search },
+  { name: "Search", href: null, icon: Search, isSheet: true },
   { name: "Explore", href: "/explore", icon: Compass },
   { name: "Reels", href: "/reels", icon: Video },
   { name: "Messages", href: "/messages", icon: MessageCircle },
-  { name: "Notifications", href: "/notifications", icon: Heart },
+  { name: "Notifications", href: null, icon: Heart, isSheet: true },
   { name: "Create", href: null, icon: PlusSquare, isDialog: true },
   { name: "Profile", href: "/profile", icon: User, isProfile: true },
 ];
@@ -54,6 +57,10 @@ export default function Sidebar() {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
+  const { openSheet: openNotificationsSheet, isOpen: isNotificationsOpen } =
+    useNotificationsSheet();
+  const { openSheet: openSearchSheet, isOpen: isSearchOpen } = useSearchSheet();
+  const isCollapsed = isNotificationsOpen || isSearchOpen;
 
   const handlePostClick = () => {
     setIsPostDialogOpen(true);
@@ -83,11 +90,35 @@ export default function Sidebar() {
 
   return (
     <div className="flex h-full flex-col p-4">
-      <div className="mb-8 px-4">
-        <Link to="/">
-          <h1 className="instagram-logo mb-5 mt-5 text-4xl text-foreground cursor-pointer hover:opacity-80 transition-opacity">
-            Instagram
-          </h1>
+      <div className="mb-8 px-4 h-20 flex items-center">
+        <Link
+          to="/"
+          className="w-full relative flex items-center justify-center"
+        >
+          <div
+            className={cn(
+              "absolute inset-0 flex items-center justify-center cursor-pointer hover:opacity-80 transition-all duration-500 ease-in-out",
+              isCollapsed
+                ? "opacity-0 scale-0 pointer-events-none"
+                : "opacity-100 scale-100"
+            )}
+          >
+            <h1 className="instagram-logo text-4xl text-foreground">
+              Instagram
+            </h1>
+          </div>
+          <div
+            className={cn(
+              "absolute inset-0 flex items-center justify-center cursor-pointer hover:opacity-80 transition-all duration-500 ease-in-out",
+              isCollapsed
+                ? "opacity-100 scale-100 translate-y-0"
+                : "opacity-0 scale-0 translate-y-4 pointer-events-none"
+            )}
+          >
+            <div className="instagram-logo text-2xl text-foreground">
+              <Instagram />
+            </div>
+          </div>
         </Link>
       </div>
       <nav className="flex-1 space-y-2">
@@ -95,18 +126,59 @@ export default function Sidebar() {
           const isActive = item.href ? location.pathname === item.href : false;
           const isProfile = item.name === "Profile";
           const isDialog = item.isDialog;
+          const isSheet = item.isSheet;
+
+          if (isSheet) {
+            const handleSheetClick = () => {
+              if (item.name === "Notifications") {
+                openNotificationsSheet();
+              } else if (item.name === "Search") {
+                openSearchSheet();
+              }
+            };
+
+            return (
+              <button
+                key={item.name}
+                onClick={handleSheetClick}
+                className={cn(
+                  "flex w-full items-center rounded-lg text-base font-medium transition-all duration-200 px-4 py-3",
+                  isActive
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.02] active:scale-[0.98]"
+                )}
+              >
+                <item.icon className="h-6 w-6 shrink-0 transition-transform duration-200 hover:scale-110" />
+                <span
+                  className={cn(
+                    "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap",
+                    isCollapsed
+                      ? "w-0 opacity-0 ml-0"
+                      : "w-auto opacity-100 ml-3"
+                  )}
+                >
+                  {item.name}
+                </span>
+              </button>
+            );
+          }
 
           if (isDialog) {
             return (
               <DropdownMenu key={item.name}>
                 <DropdownMenuTrigger asChild>
-                  <button
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg px-4 py-3 text-base font-medium transition-all duration-200 text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.02] active:scale-[0.98]"
-                    )}
-                  >
-                    <item.icon className="h-6 w-6 transition-transform duration-200 hover:scale-110" />
-                    <span>{item.name}</span>
+                  <button className="flex w-full items-center rounded-lg text-base font-medium transition-all duration-200 text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.02] active:scale-[0.98] px-4 py-3">
+                    <item.icon className="h-6 w-6 shrink-0 transition-transform duration-200 hover:scale-110" />
+                    <span
+                      className={cn(
+                        "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap",
+                        isCollapsed
+                          ? "w-0 opacity-0 ml-0"
+                          : "w-auto opacity-100 ml-3"
+                      )}
+                    >
+                      {item.name}
+                    </span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -135,7 +207,7 @@ export default function Sidebar() {
               key={item.name}
               to={item.href || "/"}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-4 py-3 text-base font-medium transition-all duration-200",
+                "flex items-center rounded-lg text-base font-medium transition-all duration-200 px-4 py-3",
                 isActive
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.02] active:scale-[0.98]"
@@ -145,12 +217,19 @@ export default function Sidebar() {
                 <img
                   src={currentUserAvatar}
                   alt="Profile"
-                  className="h-6 w-6 rounded-full object-cover transition-transform duration-200 hover:scale-110"
+                  className="h-6 w-6 rounded-full object-cover shrink-0 transition-transform duration-200 hover:scale-110"
                 />
               ) : (
-                <item.icon className="h-6 w-6 transition-transform duration-200 hover:scale-110" />
+                <item.icon className="h-6 w-6 shrink-0 transition-transform duration-200 hover:scale-110" />
               )}
-              <span>{item.name}</span>
+              <span
+                className={cn(
+                  "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap",
+                  isCollapsed ? "w-0 opacity-0 ml-0" : "w-auto opacity-100 ml-3"
+                )}
+              >
+                {item.name}
+              </span>
             </Link>
           );
         })}
@@ -158,9 +237,16 @@ export default function Sidebar() {
       <div className="pt-4 space-y-2">
         <Popover>
           <PopoverTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-base font-medium text-muted-foreground cursor-pointer transition-colors duration-200 ease-in-out hover:bg-blue-50/20 hover:text-foreground active:scale-95 active:shadow-inner focus:outline-none">
-              <Menu className="h-6 w-6" />
-              <span>More</span>
+            <button className="flex w-full items-center rounded-lg text-base font-medium text-muted-foreground cursor-pointer transition-colors duration-200 ease-in-out hover:bg-blue-50/20 hover:text-foreground active:scale-95 active:shadow-inner focus:outline-none px-4 py-3">
+              <Menu className="h-6 w-6 shrink-0" />
+              <span
+                className={cn(
+                  "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap",
+                  isCollapsed ? "w-0 opacity-0 ml-0" : "w-auto opacity-100 ml-3"
+                )}
+              >
+                More
+              </span>
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-0" align="start">
@@ -220,9 +306,16 @@ export default function Sidebar() {
       <div>
         <Popover>
           <PopoverTrigger asChild>
-            <button className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-base font-medium text-muted-foreground cursor-pointer transition-colors duration-200 ease-in-out hover:bg-blue-50/20 hover:text-foreground active:scale-95 active:shadow-inner focus:outline-none">
-              <Flower className="h-6 w-6" />
-              <span>Also from Meta</span>
+            <button className="flex w-full items-center rounded-lg text-base font-medium text-muted-foreground cursor-pointer transition-colors duration-200 ease-in-out hover:bg-blue-50/20 hover:text-foreground active:scale-95 active:shadow-inner focus:outline-none px-4 py-3">
+              <Flower className="h-6 w-6 shrink-0" />
+              <span
+                className={cn(
+                  "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap",
+                  isCollapsed ? "w-0 opacity-0 ml-0" : "w-auto opacity-100 ml-3"
+                )}
+              >
+                Also from Meta
+              </span>
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-0" align="start">
