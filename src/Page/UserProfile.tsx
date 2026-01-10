@@ -50,7 +50,10 @@ export default function UserProfile() {
     <>
       <div className="w-[80%] mx-auto flex flex-col gap-4 justify-center items-center mb-30">
         <div className="flex items-center gap-4 mt-5">
-          <Avatar image={currentUser.avatar || ""} className="h-50 w-50" />
+          <Avatar
+            image={currentUser.avatar || ""}
+            className="h-[50px] w-[50px]"
+          />
           {/* User Info */}
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
