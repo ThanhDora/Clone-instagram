@@ -23,8 +23,8 @@ export default function MainLayout() {
       >
         <Sidebar />
       </aside>
-      <main className="ml-64 flex-1 px-4 py-6">
-        <div className="mx-auto flex max-w-6xl gap-6">
+      <main className={cn("ml-64 flex-1", location.pathname === "/messages" ? "" : "px-4 py-6")}>
+        <div className={cn("flex gap-6", location.pathname === "/messages" ? "h-screen" : "mx-auto max-w-6xl")}>
           <div className="flex-1">
             <Outlet />
           </div>

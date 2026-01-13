@@ -18,7 +18,7 @@ export const mockUsers: User[] = [
     username: "lee.thanh_dev_",
     fullName: "Lê Thanh Đạt",
     email: "john@example.com",
-    avatar: "/src/assets/ava.jpg",
+    avatar: "https://i.imgur.com/p0bIfcK.jpeg",
     bio: "Tình yêu năm 17 tuổi thật sự rất đẹp nhưng cũng rất khó để có được hạnh phúc” đến 1 lúc nào đó em sẽ hiểu được 1 cái nghĩa khác ẩn trong nó",
     followers: 1250,
     following: 450,
@@ -283,6 +283,24 @@ export const mockMessages: Message[] = [
     timestamp: "Yesterday",
     isRead: false,
   },
+  {
+    id: "4",
+    conversationId: "conv4",
+    senderId: "1",
+    receiverId: "4",
+    text: "You sent an attachment.",
+    timestamp: "26w",
+    isRead: true,
+  },
+  {
+    id: "5",
+    conversationId: "conv5",
+    senderId: "1",
+    receiverId: "5",
+    text: "Tại vì thích. 🤔",
+    timestamp: "43w",
+    isRead: true,
+  },
 ];
 
 // Mock Conversations
@@ -303,6 +321,18 @@ export const mockConversations: Conversation[] = [
     id: "conv3",
     participants: ["1", "4"],
     lastMessage: undefined,
+    unreadCount: 0,
+  },
+  {
+    id: "conv4",
+    participants: ["1", "4"],
+    lastMessage: mockMessages[3],
+    unreadCount: 0,
+  },
+  {
+    id: "conv5",
+    participants: ["1", "5"],
+    lastMessage: mockMessages[4],
     unreadCount: 0,
   },
 ];
@@ -500,5 +530,6 @@ export const getNotifications = (): Notification[] => {
 };
 
 export const getUnreadNotificationsCount = (): number => {
-  return mockNotifications.filter((notification) => !notification.isRead).length;
+  return mockNotifications.filter((notification) => !notification.isRead)
+    .length;
 };

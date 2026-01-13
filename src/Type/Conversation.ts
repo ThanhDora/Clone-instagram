@@ -7,3 +7,13 @@ export interface Conversation {
   unreadCount: number;
 }
 
+export interface ConversationWithUser extends Conversation {
+  otherUser?: {
+    id: string;
+    username: string;
+    fullName: string;
+    avatar?: string;
+    isActive?: boolean;
+    lastActive?: string;
+  };
+}

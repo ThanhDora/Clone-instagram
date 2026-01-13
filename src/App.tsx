@@ -14,6 +14,7 @@ import NotificationsSheet from "./Page/Notifications";
 import Messages from "./Page/Messages";
 import CreateDialog from "./Page/Create";
 import UserProfile from "./Page/UserProfile";
+import FloatingMessages from "./Components/FloatingMessages";
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
               <CreateDialog />
               <NotificationsSheet />
               <SearchSheet />
+              <FloatingMessages />
             </BrowserRouter>
           </SearchSheetProvider>
         </NotificationsSheetProvider>
