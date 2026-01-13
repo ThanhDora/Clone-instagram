@@ -121,7 +121,7 @@ const Example = () => {
               </div>
             )}
             <Button
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-bold cursor-pointer bg-(--primary-foreground) hover:bg-(--primary-hover)"
+              className="w-full bg-blue-500 text-primary-foreground hover:bg-blue-600 text-base font-bold cursor-pointer  hover:bg-primary-hover"
               type="submit"
               disabled={isLoading || !form.formState.isValid}
             >
@@ -139,10 +139,8 @@ const Example = () => {
               type="button"
               className="flex w-full items-center justify-center gap-2 rounded-md bg-transparent px-4 py-2 text-xl font-bold text-primary hover:bg-accent cursor-pointer"
             >
-              <Facebook className="h-5 w-5 text-(--primary-blues)" />
-              <span className="text-(--primary-blues)">
-                Log in with Facebook
-              </span>
+              <Facebook className="h-5 w-5 text-blue-400" />
+              <span className="text-blue-400">Log in with Facebook</span>
             </button>
             <div className="text-center">
               <Link
@@ -160,7 +158,7 @@ const Example = () => {
           Don't have an account?{" "}
           <Link
             to="/register"
-            className="font-semibold text-(--primary) hover:underline"
+            className="font-semibold text-blue-300 hover:underline"
           >
             Sign up
           </Link>

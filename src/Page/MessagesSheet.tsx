@@ -234,13 +234,13 @@ export default function MessagesSheet({
                       )}
                       <div
                         className={cn(
-                          "max-w-[70%] rounded-lg",
-                          isFromCurrentUser ? " text-white" : " text-foreground"
+                          "max-w-[70%] rounded-lg px-4 py-2",
+                          isFromCurrentUser
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-700 text-foreground"
                         )}
                       >
-                        <p className="text-sm bg-(--primary) p-2 rounded-lg">
-                          {message.text}
-                        </p>
+                        <p className="text-sm">{message.text}</p>
                         <p
                           className={cn(
                             "text-xs mt-1",

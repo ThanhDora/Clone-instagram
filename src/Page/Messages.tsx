@@ -353,13 +353,11 @@ export default function Messages() {
                         className={cn(
                           "max-w-[70%] rounded-lg px-4 py-2 ",
                           isFromCurrentUser
-                            ? " text-primary-foreground"
-                            : " text-foreground"
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-700 text-foreground"
                         )}
                       >
-                        <p className="text-sm p-2 rounded-lg bg-(--primary)">
-                          {message.text}
-                        </p>
+                        <p className="text-sm p-2 rounded-lg">{message.text}</p>
                         <p
                           className={cn(
                             "text-xs mt-1 flex items-center justify-end",

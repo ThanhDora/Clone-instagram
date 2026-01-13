@@ -227,7 +227,7 @@ const Example = () => {
 
             {/* Sign up Button */}
             <Button
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold bg-(--primary-foreground) hover:bg-(--primary-hover) cursor-pointer"
+              className="w-full bg-blue-500 text-primary-foreground hover:bg-blue-600 text-base font-semibold cursor-pointer"
               type="submit"
               disabled={isLoading || !form.formState.isValid}
             >
@@ -241,9 +241,9 @@ const Example = () => {
           Have an account?{" "}
           <Link
             to="/login"
-            className="font-semibold text-primary hover:underline"
+            className="font-semibold text-blue-300 hover:underline"
           >
-            <span className="text-(--primary) cursor-pointer">Log in</span>
+            <span className="text-blue-300 cursor-pointer">Log in</span>
           </Link>
         </p>
       </div>

@@ -52,7 +52,7 @@ export default function UserProfile() {
         <div className="flex items-center gap-4 mt-5">
           <Avatar
             image={currentUser.avatar || ""}
-            className="h-[50px] w-[50px]"
+            className="h-[200px] w-[200px]"
           />
           {/* User Info */}
           <div className="flex flex-col">

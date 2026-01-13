@@ -1,25 +1,20 @@
 @import "tailwindcss";
 
-:root {
-  --primary: #708dff;
-  --primary-blues: #0095f6;
-  --primary-hover: #5e77e2;
-  --primary-foreground: #3746b4;
-  --primary-background: #25292e;
-  --primary-background-hover: #b8b9ba63;
-  --secondary-background: #212328;
-  @import url("https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500;600;700&display=swap");
-}
-
 @layer base {
   :root {
+    --primary: 228 100% 75%;
+    --primary-blues: 199 89% 48%;
+    --primary-hover: 228 85% 68%;
+    --primary-foreground: 0 0% 100%;
+    --primary-background: 209 15% 18%;
+    --primary-background-hover: 0 0% 72%;
+    --secondary-background: 209 15% 15%;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
@@ -30,7 +25,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 228 100% 75%;
     --radius: 0.5rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -46,8 +41,8 @@
     --card-foreground: 210 40% 98%;
     --popover: 209 25% 6%;
     --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 199 89% 48%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
@@ -58,7 +53,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --ring: 199 89% 48%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -97,8 +92,7 @@
     height: 2px;
     background-color: white;
   }
-}
-@layer base {
+
   * {
     border-color: hsl(var(--border));
   }

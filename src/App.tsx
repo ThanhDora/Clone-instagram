@@ -15,6 +15,7 @@ import Messages from "./Page/Messages";
 import CreateDialog from "./Page/Create";
 import UserProfile from "./Page/UserProfile";
 import FloatingMessages from "./Components/FloatingMessages";
+// import ProtectedRoute from "./Components/ProtectedRoute";
 
 export default function App() {
   return (
