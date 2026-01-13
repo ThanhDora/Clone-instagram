@@ -16,23 +16,38 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          "react-vendor": ["react", "react-dom", "react-router-dom"],
-          "ui-vendor": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-avatar",
-            "@radix-ui/react-scroll-area",
-          ],
-          "form-vendor": [
-            "react-hook-form",
-            "@hookform/resolvers",
-            "zod",
-          ],
-          "icons-vendor": ["lucide-react", "react-icons"],
-          "utils-vendor": ["axios", "socket.io-client", "clsx", "tailwind-merge"],
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (
+              id.includes("react") ||
+              id.includes("react-dom") ||
+              id.includes("react-router")
+            ) {
+              return "react-vendor";
+            }
+            if (id.includes("@radix-ui")) {
+              return "ui-vendor";
+            }
+            if (
+              id.includes("react-hook-form") ||
+              id.includes("@hookform") ||
+              id.includes("zod")
+            ) {
+              return "form-vendor";
+            }
+            if (id.includes("lucide-react") || id.includes("react-icons")) {
+              return "icons-vendor";
+            }
+            if (
+              id.includes("axios") ||
+              id.includes("socket.io") ||
+              id.includes("clsx") ||
+              id.includes("tailwind-merge")
+            ) {
+              return "utils-vendor";
+            }
+            return "vendor";
+          }
         },
       },
     },
