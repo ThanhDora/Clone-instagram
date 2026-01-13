@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/Context/ThemeContext";
 import { CreateDialogProvider } from "@/Context/CreateDialogContext";
@@ -6,15 +7,16 @@ import { SearchSheetProvider } from "@/Context/SearchSheetContext";
 import MainLayout from "./Layout/MainLayout";
 import Login from "./Features/Auth/Login";
 import Register from "./Features/Auth/Register";
-import Home from "./Page/Home";
-import SearchSheet from "./Page/Search";
-import Explore from "./Page/Explore";
-import Reels from "./Page/Reels";
-import NotificationsSheet from "./Page/Notifications";
-import Messages from "./Page/Messages";
-import CreateDialog from "./Page/Create";
-import UserProfile from "./Page/UserProfile";
-import FloatingMessages from "./Components/FloatingMessages";
+
+const Home = lazy(() => import("./Page/Home"));
+const SearchSheet = lazy(() => import("./Page/Search"));
+const Explore = lazy(() => import("./Page/Explore"));
+const Reels = lazy(() => import("./Page/Reels"));
+const NotificationsSheet = lazy(() => import("./Page/Notifications"));
+const Messages = lazy(() => import("./Page/Messages"));
+const CreateDialog = lazy(() => import("./Page/Create"));
+const UserProfile = lazy(() => import("./Page/UserProfile"));
+const FloatingMessages = lazy(() => import("./Components/FloatingMessages"));
 // import ProtectedRoute from "./Components/ProtectedRoute";
 
 export default function App() {
@@ -34,18 +36,55 @@ export default function App() {
                     // </ProtectedRoute>
                   }
                 >
-                  <Route path="/" element={<Home />} />
-                  <Route path="/explore" element={<Explore />} />
-                  <Route path="/reels" element={<Reels />} />
-                  <Route path="/messages" element={<Messages />} />
-                  <Route path="/profile" element={<UserProfile />} />
+                  <Route
+                    path="/"
+                    element={
+                      <Suspense fallback={<div>Loading...</div>}>
+                        <Home />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/explore"
+                    element={
+                      <Suspense fallback={<div>Loading...</div>}>
+                        <Explore />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/reels"
+                    element={
+                      <Suspense fallback={<div>Loading...</div>}>
+                        <Reels />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/messages"
+                    element={
+                      <Suspense fallback={<div>Loading...</div>}>
+                        <Messages />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/profile"
+                    element={
+                      <Suspense fallback={<div>Loading...</div>}>
+                        <UserProfile />
+                      </Suspense>
+                    }
+                  />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
-              <CreateDialog />
-              <NotificationsSheet />
-              <SearchSheet />
-              <FloatingMessages />
+              <Suspense fallback={null}>
+                <CreateDialog />
+                <NotificationsSheet />
+                <SearchSheet />
+                <FloatingMessages />
+              </Suspense>
             </BrowserRouter>
           </SearchSheetProvider>
         </NotificationsSheetProvider>

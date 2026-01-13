@@ -352,9 +352,7 @@ export default function Messages() {
                       <div
                         className={cn(
                           "max-w-[70%] rounded-lg px-4 py-2 ",
-                          isFromCurrentUser
-                            ? "bg-blue-500 text-white"
-                            : "bg-gray-700 text-foreground"
+                          isFromCurrentUser ? "bg-blue-500" : "bg-gray-400"
                         )}
                       >
                         <p className="text-sm p-2 rounded-lg">{message.text}</p>

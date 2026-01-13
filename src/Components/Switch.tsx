@@ -96,13 +96,13 @@ const Example = ({ open, onOpenChange, trigger }: SwitchProps) => {
         <DialogTrigger asChild>
           <Button
             variant="outline"
-            className="text-xs font-semibold text-(--primary) hover:text-(--primary)/80 cursor-pointer hover:underline hover:opacity-100 transition-opacity border-none"
+            className="text-xs font-semibold text-blue-300 hover:text-blue-400 cursor-pointer hover:underline hover:opacity-100 transition-opacity border-none"
           >
             Switch
           </Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-md bg-(--secondary-background) text-foreground">
+      <DialogContent className="sm:max-w-md bg-gray-800 text-foreground">
         <DialogHeader>
           <DialogTitle className="instagram-logo mb-8 text-center text-4xl text-white">
             Instagram
@@ -153,7 +153,7 @@ const Example = ({ open, onOpenChange, trigger }: SwitchProps) => {
             )}
             <DialogFooter>
               <Button
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-bold cursor-pointer bg-(--primary-foreground) hover:bg-(--primary-hover)"
+                className="w-full bg-blue-500 text-primary-foreground hover:bg-blue-600 text-base font-bold cursor-pointer"
                 type="submit"
                 disabled={isLoading || !form.formState.isValid}
               >

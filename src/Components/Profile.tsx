@@ -43,7 +43,7 @@ export default function Profile() {
       <div className="rounded-lg bg-card p-4">
         <div className="flex items-center justify-between">
           <h4 className="mb-3 text-sm font-semibold">Suggestions for you</h4>
-          <button className="text-xs font-semibold text-primary hover:text-primary/80 cursor-pointer hover:opacity-80 transition-opacity">
+          <button className="text-xs font-semibold text-blue-300 hover:text-blue-400 cursor-pointer hover:opacity-80 transition-opacity">
             See All
           </button>
         </div>
@@ -89,8 +89,8 @@ export default function Profile() {
                     </p>
                   </div>
                 </div>
-                <button className="text-xs font-semibold text-primary hover:text-primary/80">
-                  <span className="cursor-pointer text-(--primary) hover:text-(--primary)/80 transition-opacity">
+                <button className="text-xs font-semibold text-blue-300 hover:text-blue-400">
+                  <span className="cursor-pointer text-blue-300 hover:text-blue-400 transition-opacity">
                     Follow
                   </span>
                 </button>
