@@ -7,6 +7,8 @@ import { SearchSheetProvider } from "@/Context/SearchSheetContext";
 import MainLayout from "./Layout/MainLayout";
 import Login from "./Features/Auth/Login";
 import Register from "./Features/Auth/Register";
+import VerifyEmail from "./Features/Auth/VerifyEmail";
+import ProtectedRoute from "./Components/ProtectedRoute";
 
 const Home = lazy(() => import("./Page/Home"));
 const SearchSheet = lazy(() => import("./Page/Search"));
@@ -29,11 +31,12 @@ export default function App() {
               <Routes>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/verify-email/:token" element={<VerifyEmail />} />
                 <Route
                   element={
-                    // <ProtectedRoute>
-                    <MainLayout />
-                    // </ProtectedRoute>
+                    <ProtectedRoute>
+                      <MainLayout />
+                    </ProtectedRoute>
                   }
                 >
                   <Route

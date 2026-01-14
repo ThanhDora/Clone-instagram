@@ -13,7 +13,7 @@ import {
 } from "@/Components/ui/form";
 import { Input } from "@/Components/ui/input";
 import { PasswordInput } from "@/Components/ui/password-input";
-import type { TLoginResponse, TAuthError } from "@/Type/Users";
+import type { TRegisterResponse, TAuthError } from "@/Type/Users";
 import httpsRequest from "@/utils/httpsRequest";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -21,25 +21,34 @@ import { Facebook } from "lucide-react";
 
 export const title = "Signup Form";
 
-const formSchema = z.object({
-  email: z.string().email({
-    message: "Please enter a valid email address.",
-  }),
-  password: z.string().min(8, {
-    message: "Password must be at least 8 characters.",
-  }),
-  fullName: z.string().min(2, {
-    message: "Name must be at least 2 characters.",
-  }),
-  username: z.string().min(3, {
-    message: "Username must be at least 3 characters.",
-  }),
-});
+const formSchema = z
+  .object({
+    email: z.string().email({
+      message: "Please enter a valid email address.",
+    }),
+    password: z.string().min(8, {
+      message: "Password must be at least 8 characters.",
+    }),
+    confirmPassword: z.string().min(8, {
+      message: "Password must be at least 8 characters.",
+    }),
+    fullName: z.string().min(2, {
+      message: "Name must be at least 2 characters.",
+    }),
+    username: z.string().min(3, {
+      message: "Username must be at least 3 characters.",
+    }),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 const Example = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -47,6 +56,7 @@ const Example = () => {
     defaultValues: {
       email: "",
       password: "",
+      confirmPassword: "",
       fullName: "",
       username: "",
     },
@@ -55,27 +65,33 @@ const Example = () => {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
-      const response = await httpsRequest.post<TLoginResponse>(
-        "/auth/register",
+      const response = await httpsRequest.post<TRegisterResponse>(
+        "/api/auth/register",
         {
           fullName: values.fullName,
           email: values.email,
           password: values.password,
+          confirmPassword: values.confirmPassword,
           username: values.username,
         }
       );
-      const data = response.data;
 
-      localStorage.setItem("token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
+      // Register does NOT return tokens - user must verify email first
+      setSuccessMessage(
+        response.data.message ||
+          "User registered successfully. Please check your email to verify your account."
+      );
 
-      if (data.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-      }
+      // Clear form
+      form.reset();
 
-      navigate("/");
+      // Redirect to login after a delay or let user click to login
+      setTimeout(() => {
+        navigate("/login");
+      }, 3000);
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: TAuthError } };
       const errorData: TAuthError = axiosError.response?.data || {
@@ -154,6 +170,22 @@ const Example = () => {
             />
             <FormField
               control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <PasswordInput
+                      className="text-foreground placeholder:text-muted-foreground"
+                      placeholder="Confirm Password"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="fullName"
               render={({ field }) => (
                 <FormItem>
@@ -222,6 +254,11 @@ const Example = () => {
             {error && (
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
+              </div>
+            )}
+            {successMessage && (
+              <div className="rounded-md bg-green-500/10 p-3 text-sm text-green-600 dark:text-green-400">
+                {successMessage}
               </div>
             )}
 

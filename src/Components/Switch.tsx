@@ -63,13 +63,13 @@ const Example = ({ open, onOpenChange, trigger }: SwitchProps) => {
 
     try {
       const response = await httpsRequest.post<TLoginResponse>(
-        "/auth/login",
+        "/api/auth/login",
         values
       );
-      const data = response.data;
+      const data = response.data.data;
 
-      localStorage.setItem("token", data.access_token);
-      localStorage.setItem("refresh_token", data.refresh_token);
+      localStorage.setItem("token", data.accessToken);
+      localStorage.setItem("refresh_token", data.refreshToken);
 
       if (data.user) {
         localStorage.setItem("user", JSON.stringify(data.user));

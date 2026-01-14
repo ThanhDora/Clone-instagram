@@ -23,20 +23,20 @@ httpsRequest.interceptors.response.use(
   },
   async (error) => {
     const refreshToken = localStorage.getItem("refresh_token");
-    const checkRenewToken = refreshToken && error.status === 401; // kiểm tra xem có quyền refresh hay không
+    const checkRenewToken = refreshToken && error.response?.status === 401; // kiểm tra xem có quyền refresh hay không
 
     if (checkRenewToken) {
       if (!isRefresh) {
         isRefresh = true; // chặn không cho refresh nữa
 
         try {
-          const token = await axios.post(`${baseURL}/auth/refresh-token`, {
+          const token = await axios.post(`${baseURL}/api/auth/refresh-token`, {
             refreshToken: refreshToken,
           });
 
-          // access_token và refresh_token sửa lại tương ứng api anh An cấp
-          localStorage.setItem("token", token.data.access_token);
-          localStorage.setItem("refresh_token", token.data.refresh_token);
+          // accessToken và refreshToken sửa lại tương ứng api structure mới
+          localStorage.setItem("token", token.data.data.accessToken);
+          localStorage.setItem("refresh_token", token.data.data.refreshToken);
 
           listener.forEach((item) => item()); // gọi lại những api bị lỗi vào sau
 
