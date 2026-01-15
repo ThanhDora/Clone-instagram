@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 
 export default function MainLayout() {
   const location = useLocation();
-  const hideProfileRoutes = ["/profile", "/messages", "/reels", "/explore"];
-  const shouldHideProfile = hideProfileRoutes.includes(location.pathname);
+  const hideProfileRoutes = ["/profile", "/messages", "/reels", "/explore", "/edit-profile"];
+  const shouldHideProfile = hideProfileRoutes.includes(location.pathname) || location.pathname.startsWith("/profile/");
   const { isOpen: isNotificationsOpen } = useNotificationsSheet();
   const { isOpen: isSearchOpen } = useSearchSheet();
   const isCollapsed = isNotificationsOpen || isSearchOpen;

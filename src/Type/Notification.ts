@@ -10,3 +10,40 @@ export interface Notification {
   isRead: boolean;
 }
 
+export interface TNotification {
+  _id: string;
+  userId: {
+    _id: string;
+    username: string;
+    fullName?: string;
+    profilePicture?: string;
+  };
+  type: "like" | "comment" | "follow" | "mention" | "post";
+  relatedPostId?: string;
+  relatedPostImage?: string;
+  content?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface TNotificationsResponse {
+  success: boolean;
+  message: string;
+  data: {
+    notifications: TNotification[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalNotifications: number;
+      hasMore: boolean;
+    };
+  };
+}
+
+export interface TUnreadNotificationsCountResponse {
+  success: boolean;
+  message: string;
+  data: {
+    unreadCount: number;
+  };
+}

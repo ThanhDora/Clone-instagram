@@ -21,12 +21,16 @@ function Avatar({
 
 function AvatarImage({
   className,
+  crossOrigin,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Image>) {
+}: React.ComponentProps<typeof AvatarPrimitive.Image> & {
+  crossOrigin?: "anonymous" | "use-credentials";
+}) {
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
       className={cn("aspect-square size-full", className)}
+      crossOrigin={crossOrigin}
       {...props}
     />
   );

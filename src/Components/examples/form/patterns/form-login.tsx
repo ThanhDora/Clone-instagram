@@ -13,7 +13,12 @@ import {
 } from "@/Components/ui/form";
 import { Input } from "@/Components/ui/input";
 import { PasswordInput } from "@/Components/ui/password-input";
-import type { TLoginRequest, TLoginResponse, TAuthError } from "@/Type/Users";
+import type {
+  TLoginRequest,
+  TLoginResponse,
+  TAuthError,
+  TUser,
+} from "@/Type/Users";
 import httpsRequest from "@/utils/httpsRequest";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -53,20 +58,112 @@ const Example = () => {
         "/api/auth/login",
         values
       );
-      const data = response.data.data;
 
-      localStorage.setItem("token", data.accessToken);
-      localStorage.setItem("refresh_token", data.refreshToken);
+      // Kiểm tra response structure
+      if (!response.data) {
+        console.error("No response data");
+        throw new Error("No response from server");
+      }
 
-      if (data.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
+      // Kiểm tra success flag
+      if (response.data.success === false) {
+        const errorMsg = response.data.message || "Login failed";
+        console.error("Login failed:", errorMsg);
+        setError(errorMsg);
+        return;
+      }
+
+      // Thử nhiều cách để lấy data
+      const responseData = response.data;
+      const data = responseData.data;
+      let accessToken: string | undefined;
+      let refreshToken: string | undefined;
+      let user: TUser | undefined;
+
+      // Case 1: Standard structure { success, message, data: { accessToken, refreshToken, user } }
+      if (data && typeof data === "object" && "accessToken" in data) {
+        accessToken = data.accessToken;
+        refreshToken = data.refreshToken;
+        user = data.user;
+      }
+      // Case 2: Direct structure { success, message, accessToken, refreshToken, user }
+      else if ("accessToken" in responseData) {
+        const directData = responseData as unknown as {
+          accessToken?: string;
+          refreshToken?: string;
+          user?: TUser;
+        };
+        accessToken = directData.accessToken;
+        refreshToken = directData.refreshToken;
+        user = directData.user;
+      }
+      // Case 3: Nested in data but different structure (e.g., data.tokens.accessToken)
+      else if (data && typeof data === "object") {
+
+        const altData = data as Record<string, unknown>;
+
+        // Try to get from tokens object
+        if (altData.tokens && typeof altData.tokens === "object") {
+          const tokens = altData.tokens as Record<string, unknown>;
+          accessToken = (tokens.accessToken ||
+            tokens.access_token ||
+            tokens.token) as string | undefined;
+          refreshToken = (tokens.refreshToken || tokens.refresh_token) as
+            | string
+            | undefined;
+        }
+
+        // Try alternative field names directly in data
+        if (!accessToken) {
+          accessToken = (altData.accessToken ||
+            altData.access_token ||
+            altData.token) as string | undefined;
+          refreshToken = (altData.refreshToken || altData.refresh_token) as
+            | string
+            | undefined;
+        }
+
+        user = altData.user as TUser | undefined;
+      }
+
+      if (!accessToken) {
+        console.error("No accessToken found in any structure:", {
+          responseData: response.data,
+          data: data,
+          allKeys: Object.keys(response.data || {}),
+        });
+        throw new Error("Invalid response structure: no accessToken found");
+      }
+
+      // Lưu token
+      localStorage.setItem("token", accessToken);
+      localStorage.setItem("refresh_token", refreshToken || "");
+
+      if (user) {
+        localStorage.setItem("user", JSON.stringify(user));
       }
 
       navigate("/");
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: TAuthError } };
+      console.error("Login error:", err);
+      const axiosError = err as {
+        response?: {
+          status?: number;
+          data?: TAuthError;
+        };
+        message?: string;
+      };
+
+      // Log chi tiết lỗi
+      if (axiosError.response) {
+        console.error("Error response:", {
+          status: axiosError.response.status,
+          data: axiosError.response.data,
+        });
+      }
+
       const errorData: TAuthError = axiosError.response?.data || {
-        message: "An error occurred. Please try again.",
+        message: axiosError.message || "An error occurred. Please try again.",
       };
       setError(errorData.message || "Login failed");
     } finally {

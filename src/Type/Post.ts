@@ -1,13 +1,31 @@
 export interface Post {
-  id: string;
-  userId: string;
-  username: string;
-  userAvatar?: string;
-  image: string;
-  caption: string;
+  _id: string;
+  userId?: string;
+  caption?: string;
+  image?: string;
+  video?: string;
+  mediaType: "image" | "video";
   likes: number;
   comments: number;
-  timestamp: string;
-  isLiked?: boolean;
+  createdAt: string;
+  user?: {
+    _id: string;
+    username: string;
+    fullName?: string;
+    profilePicture?: string;
+  };
 }
 
+export type TGetUserPostsResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    posts: Post[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalPosts: number;
+      hasMore: boolean;
+    };
+  };
+};

@@ -18,6 +18,7 @@ const NotificationsSheet = lazy(() => import("./Page/Notifications"));
 const Messages = lazy(() => import("./Page/Messages"));
 const CreateDialog = lazy(() => import("./Page/Create"));
 const UserProfile = lazy(() => import("./Page/UserProfile"));
+const EditProfile = lazy(() => import("./Page/EditProfile"));
 const FloatingMessages = lazy(() => import("./Components/FloatingMessages"));
 // import ProtectedRoute from "./Components/ProtectedRoute";
 
@@ -72,10 +73,26 @@ export default function App() {
                     }
                   />
                   <Route
+                    path="/profile/:userId"
+                    element={
+                      <Suspense fallback={<div>Loading...</div>}>
+                        <UserProfile />
+                      </Suspense>
+                    }
+                  />
+                  <Route
                     path="/profile"
                     element={
                       <Suspense fallback={<div>Loading...</div>}>
                         <UserProfile />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="/edit-profile"
+                    element={
+                      <Suspense fallback={<div>Loading...</div>}>
+                        <EditProfile />
                       </Suspense>
                     }
                   />

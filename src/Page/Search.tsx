@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Sheet,
   SheetContent,
@@ -7,27 +8,250 @@ import {
   SheetTitle,
 } from "@/Components/ui/sheet";
 import { Input } from "@/Components/ui/input";
+import { Button } from "@/Components/ui/button";
 import { useSearchSheet } from "@/Context/SearchSheetContext";
-import { mockUsers } from "@/assets/db";
-import { cn } from "@/lib/utils";
-import { Search as SearchIcon } from "lucide-react";
+import { cn, getImageUrl } from "@/lib/utils";
+import { Search as SearchIcon, X } from "lucide-react";
+import httpsRequest from "@/utils/httpsRequest";
+import type {
+  TSearchUsersResponse,
+  TSearchUser,
+  TAuthError,
+  TSearchHistoryResponse,
+  TSearchHistoryItem,
+  TAddSearchHistoryRequest,
+} from "@/Type/Users";
 
 export default function SearchSheet() {
   const { isOpen, closeSheet } = useSearchSheet();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<TSearchUser[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchHistory, setSearchHistory] = useState<TSearchHistoryItem[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
-  const filteredUsers = useMemo(() => {
-    const trimmedQuery = searchQuery.trim();
-    if (!trimmedQuery) {
-      return [];
-    }
-    const query = trimmedQuery.toLowerCase();
-    return mockUsers.filter((user) => {
-      const username = user.username.toLowerCase().trim();
-      const fullName = user.fullName.toLowerCase().trim();
-      return username.startsWith(query) || fullName.startsWith(query);
-    });
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Fetch search results from API
+  useEffect(() => {
+    const fetchSearchResults = async () => {
+      const trimmedQuery = debouncedQuery.trim();
+
+      if (!trimmedQuery) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+
+      setIsSearching(true);
+      setError(null);
+
+      try {
+        const response = await httpsRequest.get<TSearchUsersResponse>(
+          "/api/users/search",
+          {
+            params: {
+              q: trimmedQuery,
+            },
+          }
+        );
+        if (response.data?.data) {
+          setSearchResults(response.data.data);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (err: unknown) {
+        const axiosError = err as {
+          response?: { status?: number; data?: TAuthError };
+        };
+
+        console.error("Search error:", err);
+
+        if (axiosError.response?.status === 401) {
+          setError("Please login to search");
+        } else {
+          const errorData: TAuthError = axiosError.response?.data || {
+            message: "Failed to search users",
+          };
+          setError(errorData.message);
+        }
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    fetchSearchResults();
+  }, [debouncedQuery]);
+
+  const fetchSearchHistory = useCallback(async () => {
+    const token =
+      localStorage.getItem("token") || localStorage.getItem("access_token");
+    if (!token) {
+      setSearchHistory([]);
+      setIsLoadingHistory(false);
+      return;
+    }
+
+    setIsLoadingHistory(true);
+    try {
+      const response = await httpsRequest.get<TSearchHistoryResponse>(
+        "/api/search-history",
+        {
+          params: {
+            limit: 20,
+          },
+        }
+      );
+      if (response.data?.data && Array.isArray(response.data.data)) {
+        setSearchHistory(response.data.data);
+      } else {
+        setSearchHistory([]);
+      }
+    } catch (err: unknown) {
+      console.error("Failed to fetch search history:", err);
+      setSearchHistory([]);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && !searchQuery.trim()) {
+      fetchSearchHistory();
+    }
+  }, [isOpen, searchQuery, fetchSearchHistory]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery("");
+      setDebouncedQuery("");
+      setSearchResults([]);
+      setError(null);
+    }
+  }, [isOpen]);
+
+  const saveSearchHistory = useCallback(
+    async (userId: string, query: string) => {
+      const token =
+        localStorage.getItem("token") || localStorage.getItem("access_token");
+      if (!token) return;
+
+      const userIdString = typeof userId === "string" ? userId : String(userId);
+
+      try {
+        await httpsRequest.post<TAddSearchHistoryRequest>(
+          "/api/search-history",
+          {
+            searchedUserId: userIdString,
+            searchQuery: query,
+          }
+        );
+        fetchSearchHistory();
+      } catch (err: unknown) {
+        console.error("Failed to save search history:", err);
+      }
+    },
+    [fetchSearchHistory]
+  );
+
+  const handleUserClick = useCallback(
+    (userId: string, username?: string) => {
+      if (searchQuery.trim() && username) {
+        saveSearchHistory(userId, searchQuery.trim());
+      }
+      navigate(`/profile/${userId}`);
+      closeSheet();
+    },
+    [navigate, closeSheet, searchQuery, saveSearchHistory]
+  );
+
+  const handleDeleteHistoryItem = useCallback(
+    async (historyId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      try {
+        await httpsRequest.delete(`/api/search-history/${historyId}`);
+        setSearchHistory((prev) =>
+          prev.filter((item) => item._id !== historyId)
+        );
+      } catch (err: unknown) {
+        console.error("Failed to delete search history:", err);
+      }
+    },
+    []
+  );
+
+  const handleClearAllHistory = useCallback(async () => {
+    try {
+      await httpsRequest.delete("/api/search-history");
+      setSearchHistory([]);
+    } catch (err: unknown) {
+      console.error("Failed to clear search history:", err);
+    }
+  }, []);
+
+  const handleHistoryItemClick = useCallback(
+    (item: TSearchHistoryItem) => {
+      let userId: string | null = null;
+
+      if (item.searchedUser) {
+        if (
+          typeof item.searchedUser === "object" &&
+          item.searchedUser !== null
+        ) {
+          const userObj = item.searchedUser as { _id?: unknown };
+          if (userObj._id) {
+            if (typeof userObj._id === "string") {
+              userId = userObj._id;
+            } else if (
+              typeof userObj._id === "object" &&
+              userObj._id !== null &&
+              "toString" in userObj._id
+            ) {
+              userId = (userObj._id as { toString: () => string }).toString();
+            } else {
+              userId = String(userObj._id);
+            }
+          }
+        } else if (typeof item.searchedUser === "string") {
+          userId = item.searchedUser;
+        }
+      } else if (item.searchedUserId) {
+        if (typeof item.searchedUserId === "string") {
+          userId = item.searchedUserId;
+        } else if (
+          typeof item.searchedUserId === "object" &&
+          item.searchedUserId !== null &&
+          "toString" in item.searchedUserId
+        ) {
+          userId = (
+            item.searchedUserId as { toString: () => string }
+          ).toString();
+        } else {
+          userId = String(item.searchedUserId);
+        }
+      }
+
+      if (userId && userId !== "[object Object]") {
+        setSearchQuery(item.searchQuery);
+        navigate(`/profile/${userId}`);
+        closeSheet();
+      } else {
+        setSearchQuery(item.searchQuery);
+      }
+    },
+    [navigate, closeSheet]
+  );
 
   return (
     <Sheet open={isOpen} onOpenChange={closeSheet}>
@@ -66,34 +290,162 @@ export default function SearchSheet() {
         <div className="flex-1 overflow-y-auto">
           <div className="py-2">
             {!searchQuery.trim() ? (
-              <div className="px-4 py-8 text-center text-muted-foreground">
-                <p className="text-sm">Start typing to search</p>
+              <div>
+                {isLoadingHistory ? (
+                  <div className="px-4 py-8 text-center text-muted-foreground">
+                    <p className="text-sm">Loading history...</p>
+                  </div>
+                ) : (
+                  (() => {
+                    const validHistoryItems = searchHistory.filter(
+                      (item) =>
+                        (item.searchedUser && item.searchedUser._id) ||
+                        item.searchQuery
+                    );
+                    return validHistoryItems.length > 0 ? (
+                      <>
+                        <div className="px-4 py-2 flex items-center justify-between border-b border-border">
+                          <h3 className="text-sm font-semibold">Recent</h3>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleClearAllHistory}
+                            className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            Clear all
+                          </Button>
+                        </div>
+                        {validHistoryItems.map((item) => {
+                          const username =
+                            item.searchedUser?.username || item.searchQuery;
+                          const avatarUrl = item.searchedUser?.profilePicture;
+                          const initial =
+                            username?.charAt(0)?.toUpperCase() || "U";
+
+                          return (
+                            <div
+                              key={item._id}
+                              onClick={() => handleHistoryItemClick(item)}
+                              className={cn(
+                                "flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer group"
+                              )}
+                            >
+                              <div className="shrink-0 relative">
+                                {avatarUrl ? (
+                                  <img
+                                    src={getImageUrl(avatarUrl)}
+                                    alt={username}
+                                    className="h-10 w-10 rounded-full object-cover aspect-square"
+                                    crossOrigin="anonymous"
+                                    onError={(e) => {
+                                      const target =
+                                        e.target as HTMLImageElement;
+                                      target.style.display = "none";
+                                      const fallback =
+                                        target.nextElementSibling as HTMLElement;
+                                      if (fallback)
+                                        fallback.style.display = "flex";
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className={`h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold ${
+                                    avatarUrl ? "hidden" : ""
+                                  }`}
+                                >
+                                  {initial}
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-foreground">
+                                  {username}
+                                </p>
+                                {item.searchedUser?.fullName && (
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {item.searchedUser.fullName}
+                                  </p>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) =>
+                                  handleDeleteHistoryItem(item._id, e)
+                                }
+                                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <div className="px-4 py-8 text-center text-muted-foreground">
+                        <p className="text-sm">Start typing to search</p>
+                      </div>
+                    );
+                  })()
+                )}
               </div>
-            ) : filteredUsers.length > 0 ? (
-              filteredUsers.map((user) => (
-                <div
-                  key={user.id}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer"
-                  )}
-                >
-                  <div className="shrink-0">
-                    <img
-                      src={user.avatar}
-                      alt={user.username}
-                      className="h-10 w-10 rounded-full object-cover aspect-square"
-                    />
+            ) : isSearching ? (
+              <div className="px-4 py-8 text-center text-muted-foreground">
+                <p className="text-sm">Searching...</p>
+              </div>
+            ) : error ? (
+              <div className="px-4 py-8 text-center text-destructive">
+                <p className="text-sm">{error}</p>
+              </div>
+            ) : searchResults.length > 0 ? (
+              searchResults.map((user) => {
+                const avatarUrl = user.profilePicture;
+                const initial = user.username?.charAt(0)?.toUpperCase() || "U";
+
+                return (
+                  <div
+                    key={user._id}
+                    onClick={() => handleUserClick(user._id, user.username)}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer"
+                    )}
+                  >
+                    <div className="shrink-0 relative">
+                      {avatarUrl ? (
+                        <img
+                          src={getImageUrl(avatarUrl)}
+                          alt={user.username}
+                          className="h-10 w-10 rounded-full object-cover aspect-square"
+                          crossOrigin="anonymous"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = "none";
+                            const fallback =
+                              target.nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = "flex";
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold ${
+                          avatarUrl ? "hidden" : ""
+                        }`}
+                      >
+                        {initial}
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground">
+                        {user.username}
+                      </p>
+                      {user.fullName && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {user.fullName}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground">
-                      {user.username}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {user.fullName}
-                    </p>
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="px-4 py-8 text-center text-muted-foreground">
                 <p className="text-sm">No users found</p>

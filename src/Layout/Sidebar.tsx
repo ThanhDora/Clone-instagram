@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Home,
   Search,
@@ -28,9 +28,10 @@ import {
   TbBrandMeta,
 } from "react-icons/tb";
 
-import { cn } from "@/lib/utils";
+import { cn, getImageUrl } from "@/lib/utils";
 import { useTheme } from "@/hooks/useTheme";
-import { mockUsers, getUserById } from "@/assets/db";
+import httpsRequest from "@/utils/httpsRequest";
+import type { TGetProfileResponse, TUser } from "@/Type/Users";
 import { Popover, PopoverContent, PopoverTrigger } from "@/Components/popover";
 import {
   DropdownMenu,
@@ -62,6 +63,7 @@ export default function Sidebar() {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState<TUser | null>(null);
   const { openSheet: openNotificationsSheet, isOpen: isNotificationsOpen } =
     useNotificationsSheet();
   const { openSheet: openSearchSheet, isOpen: isSearchOpen } = useSearchSheet();
@@ -71,21 +73,32 @@ export default function Sidebar() {
     setIsPostDialogOpen(true);
   };
 
-  // Get current user avatar
-  const currentUserStr = localStorage.getItem("user");
-  let currentUserAvatar = "";
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await httpsRequest.get<TGetProfileResponse>(
+          "/api/users/profile"
+        );
+        setCurrentUser(response.data.data);
+      } catch {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          try {
+            setCurrentUser(JSON.parse(userStr));
+          } catch {
+            // Ignore
+          }
+        }
+      }
+    };
 
-  if (currentUserStr) {
-    try {
-      const parsedUser = JSON.parse(currentUserStr);
-      const user = getUserById(parsedUser.id);
-      currentUserAvatar = user?.avatar || "";
-    } catch {
-      currentUserAvatar = mockUsers[0]?.avatar || "";
-    }
-  } else {
-    currentUserAvatar = mockUsers[0]?.avatar || "";
-  }
+    fetchCurrentUser();
+  }, []);
+
+  const currentUserAvatar = getImageUrl(
+    currentUser?.profilePicture || currentUser?.avatar || ""
+  );
+  const currentUserInitial = currentUser?.username?.[0]?.toUpperCase() || "U";
 
   // const handleLogout = () => {
   //   localStorage.removeItem("token");
@@ -218,13 +231,28 @@ export default function Sidebar() {
                   : "text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.02] active:scale-[0.98]"
               )}
             >
-              {isProfile && currentUserAvatar ? (
-                <img
-                  src={currentUserAvatar}
-                  alt="Profile"
-                  className="h-6 w-6 rounded-full object-cover shrink-0 transition-transform duration-200 hover:scale-110"
-                />
-              ) : (
+              {isProfile ? (
+                currentUserAvatar ? (
+                  <img
+                    src={currentUserAvatar}
+                    alt="Profile"
+                    className="h-6 w-6 rounded-full object-cover shrink-0 transition-transform duration-200 hover:scale-110"
+                    crossOrigin="anonymous"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = "none";
+                      const fallback = target.nextElementSibling as HTMLElement;
+                      if (fallback) fallback.style.display = "flex";
+                    }}
+                  />
+                ) : null
+              ) : null}
+              {isProfile && !currentUserAvatar && (
+                <div className="h-6 w-6 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold text-xs shrink-0 transition-transform duration-200 hover:scale-110">
+                  {currentUserInitial}
+                </div>
+              )}
+              {!isProfile && (
                 <item.icon className="h-6 w-6 shrink-0 transition-transform duration-200 hover:scale-110" />
               )}
               <span

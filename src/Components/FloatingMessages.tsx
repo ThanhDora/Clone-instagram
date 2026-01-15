@@ -1,24 +1,79 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { Send } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/Components/ui/avatar";
-import { mockConversations, getUserById } from "@/assets/db";
-import { cn } from "@/lib/utils";
+import { cn, getImageUrl } from "@/lib/utils";
 import MessagesSheet from "@/Page/MessagesSheet";
-
-const currentUserId = "1";
+import httpsRequest from "@/utils/httpsRequest";
+import type {
+  TConversationsResponse,
+  TConversation,
+} from "@/Type/Conversation";
+import type { TGetProfileResponse, TUser } from "@/Type/Users";
 
 export default function FloatingMessages() {
   const location = useLocation();
   const [isHovered, setIsHovered] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [conversations, setConversations] = useState<TConversation[]>([]);
+  const [currentUser, setCurrentUser] = useState<TUser | null>(null);
 
-  const recentConversations = mockConversations.slice(0, 3);
-  const avatars = recentConversations.map((conv) => {
-    const otherUserId = conv.participants.find((id) => id !== currentUserId);
-    const otherUser = otherUserId ? getUserById(otherUserId) : undefined;
-    return otherUser;
-  });
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await httpsRequest.get<TGetProfileResponse>(
+          "/api/users/profile"
+        );
+        setCurrentUser(response.data.data);
+      } catch {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          try {
+            setCurrentUser(JSON.parse(userStr));
+          } catch {
+            // Ignore
+          }
+        }
+      }
+    };
+
+    const fetchConversations = async () => {
+      try {
+        const response = await httpsRequest.get<TConversationsResponse>(
+          "/api/messages/conversations",
+          {
+            params: {
+              page: 1,
+              limit: 3,
+            },
+          }
+        );
+        setConversations(response.data.data.conversations);
+      } catch (err) {
+        console.error("Failed to fetch conversations:", err);
+      }
+    };
+
+    fetchCurrentUser();
+    fetchConversations();
+  }, []);
+
+  const avatars = conversations
+    .slice(0, 3)
+    .map((conv) => {
+      if (!currentUser) return null;
+      const otherUser = conv.participants.find(
+        (p) => p._id !== currentUser._id
+      );
+      return otherUser
+        ? {
+            _id: otherUser._id,
+            username: otherUser.username,
+            profilePicture: otherUser.profilePicture,
+          }
+        : null;
+    })
+    .filter((user) => user !== null);
 
   const handleClick = () => {
     setIsSheetOpen(true);
@@ -46,13 +101,16 @@ export default function FloatingMessages() {
         <div className="flex items-center -space-x-2">
           {avatars.map((user, index) => (
             <Avatar
-              key={index}
+              key={user?._id || index}
               className="h-8 w-8 border-2 border-card shrink-0"
             >
-              {user?.avatar && (
-                <AvatarImage src={user.avatar} alt={user.username} />
+              {user?.profilePicture && (
+                <AvatarImage
+                  src={getImageUrl(user.profilePicture)}
+                  alt={user.username}
+                />
               )}
-              <AvatarFallback>
+              <AvatarFallback className="bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
                 {user?.username?.[0]?.toUpperCase() || "U"}
               </AvatarFallback>
             </Avatar>

@@ -1,59 +1,103 @@
 import axios from "axios";
 
-const baseURL = import.meta.env.VITE_BASE_URL;
+const baseURL = import.meta.env.VITE_BASE_URL || "https://instagram.f8team.dev";
 
 const httpsRequest = axios.create({
   baseURL,
 });
 
-httpsRequest.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
+let isRefresh = false;
+let listener = []; // Queue các request đang chờ refresh
+let failedRefresh = false;
 
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+httpsRequest.interceptors.request.use((config) => {
+  // Đọc token từ cả hai key để tương thích
+  const token =
+    localStorage.getItem("token") || localStorage.getItem("access_token");
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+    failedRefresh = false; // Reset flag khi có token hợp lệ
+  }
 
   return config;
 });
-
-let isRefresh = false; // chỉ cho phép refresh token với thằng đầu tiên được chạy vào với lỗi 401
-let listener = []; // mảng chứa các api lỗi cần được gọi lại
 
 httpsRequest.interceptors.response.use(
   (response) => {
     return response;
   },
   async (error) => {
+    const originalRequest = error.config;
     const refreshToken = localStorage.getItem("refresh_token");
-    const checkRenewToken = refreshToken && error.response?.status === 401; // kiểm tra xem có quyền refresh hay không
+    const shouldRefresh =
+      refreshToken &&
+      error.response?.status === 401 &&
+      !failedRefresh &&
+      !originalRequest._retry;
 
-    if (checkRenewToken) {
+    if (shouldRefresh) {
       if (!isRefresh) {
-        isRefresh = true; // chặn không cho refresh nữa
+        isRefresh = true;
+        originalRequest._retry = true; // Đánh dấu để tránh lặp
 
         try {
-          const token = await axios.post(`${baseURL}/api/auth/refresh-token`, {
-            refreshToken: refreshToken,
-          });
+          const tokenResponse = await axios.post(
+            `${baseURL}/auth/refresh-token`, // Đã có /api trong baseURL
+            {
+              refreshToken: refreshToken,
+            }
+          );
 
-          // accessToken và refreshToken sửa lại tương ứng api structure mới
-          localStorage.setItem("token", token.data.data.accessToken);
-          localStorage.setItem("refresh_token", token.data.data.refreshToken);
+          if (!tokenResponse.data?.success) {
+            throw new Error("Refresh token failed");
+          }
 
-          listener.forEach((item) => item()); // gọi lại những api bị lỗi vào sau
+          const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
+            tokenResponse.data.data;
 
+          // Lưu cả token và access_token để tương thích
+          localStorage.setItem("token", newAccessToken);
+          localStorage.setItem("access_token", newAccessToken);
+          localStorage.setItem("refresh_token", newRefreshToken);
+
+          // Resolve tất cả request đang chờ
+          listener.forEach((resolve) => resolve());
           listener = [];
+
           isRefresh = false;
-          return httpsRequest(error.config); // gọi lại api lỗi được phản hồi đầu tiên
-        } catch (error) {
+          failedRefresh = false;
+
+          // Retry request gốc với token mới
+          return httpsRequest(originalRequest);
+        } catch (refreshError) {
+          failedRefresh = true;
+          isRefresh = false;
+
+          // Xóa token và redirect login
           localStorage.removeItem("token");
+          localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
+          localStorage.removeItem("user"); // nếu bạn lưu user
 
+          // Reject tất cả request đang chờ
+          listener.forEach((reject) => reject(refreshError));
           listener = [];
-          isRefresh = false;
+
+          // Redirect về login (chỉnh path nếu cần)
+          window.location.href = "/login";
+
+          return Promise.reject(refreshError);
         }
       } else {
-        return new Promise((resolve) => {
+        // Nếu đang refresh, queue request này lại
+        return new Promise((resolve, reject) => {
           listener.push(() => {
-            resolve(httpsRequest(error.config)); // những api phản hồi chậm hơn sẽ được push vào mảng trong trạng thái pending
+            if (failedRefresh) {
+              reject(error);
+            } else {
+              resolve(httpsRequest(originalRequest));
+            }
           });
         });
       }

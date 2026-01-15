@@ -68,6 +68,13 @@ const Example = ({ open, onOpenChange, trigger }: SwitchProps) => {
       );
       const data = response.data.data;
 
+      if (!data || !data.accessToken) {
+        console.error("Invalid login response:", data);
+        throw new Error("Invalid response from server");
+      }
+
+      // Lưu cả access_token và token để tương thích
+      localStorage.setItem("access_token", data.accessToken);
       localStorage.setItem("token", data.accessToken);
       localStorage.setItem("refresh_token", data.refreshToken);
 
