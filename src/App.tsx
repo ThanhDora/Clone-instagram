@@ -9,6 +9,7 @@ import MainLayout from "./Layout/MainLayout";
 import Login from "./Features/Auth/Login";
 import Register from "./Features/Auth/Register";
 import VerifyEmail from "./Features/Auth/VerifyEmail";
+import GoogleCallback from "./Features/Auth/GoogleCallback";
 import ProtectedRoute from "./Components/ProtectedRoute";
 import Loading from "./Components/Loading";
 
@@ -38,6 +39,10 @@ export default function App() {
                   <Route
                     path="/verify-email/:token"
                     element={<VerifyEmail />}
+                  />
+                  <Route
+                    path="/auth/google/callback"
+                    element={<GoogleCallback />}
                   />
                   <Route
                     element={

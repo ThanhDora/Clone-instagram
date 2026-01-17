@@ -22,7 +22,7 @@ import type {
 import httpsRequest from "@/utils/httpsRequest";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Facebook } from "lucide-react";
+import { FaGoogle } from "react-icons/fa";
 
 export const title = "Login Form";
 
@@ -48,6 +48,25 @@ const Example = () => {
       password: "",
     },
   });
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const baseURL =
+        import.meta.env.VITE_BASE_URL || "https://instagram.f8team.dev";
+      const redirectUri = `${window.location.origin}/auth/google/callback`;
+      const googleAuthUrl = `${baseURL}/api/auth/google?redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}`;
+      window.location.href = googleAuthUrl;
+    } catch (err: unknown) {
+      console.error("Google login error:", err);
+      setError("Failed to initiate Google login. Please try again.");
+      setIsLoading(false);
+    }
+  };
 
   async function onSubmit(values: TLoginRequest) {
     setIsLoading(true);
@@ -99,7 +118,6 @@ const Example = () => {
       }
       // Case 3: Nested in data but different structure (e.g., data.tokens.accessToken)
       else if (data && typeof data === "object") {
-
         const altData = data as Record<string, unknown>;
 
         // Try to get from tokens object
@@ -234,10 +252,14 @@ const Example = () => {
             </div>
             <button
               type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-transparent px-4 py-2 text-xl font-bold text-primary hover:bg-accent cursor-pointer"
+              onClick={handleGoogleLogin}
+              disabled={isLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-transparent px-4 py-2 text-xl font-bold text-primary hover:bg-accent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Facebook className="h-5 w-5 text-blue-400" />
-              <span className="text-blue-400">Log in with Facebook</span>
+              <FaGoogle className="h-5 w-5 text-blue-400" />
+              <span className="text-blue-400">
+                {isLoading ? "Redirecting..." : "Log in with Google"}
+              </span>
             </button>
             <div className="text-center">
               <Link

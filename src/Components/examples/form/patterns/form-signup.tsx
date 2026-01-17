@@ -17,7 +17,7 @@ import type { TRegisterResponse, TAuthError } from "@/Type/Users";
 import httpsRequest from "@/utils/httpsRequest";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Facebook } from "lucide-react";
+import { FaGoogle } from "react-icons/fa";
 
 export const title = "Signup Form";
 
@@ -61,6 +61,26 @@ const Example = () => {
       username: "",
     },
   });
+
+  const handleGoogleSignup = async () => {
+    setIsLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const baseURL =
+        import.meta.env.VITE_BASE_URL || "https://instagram.f8team.dev";
+      const redirectUri = `${window.location.origin}/auth/google/callback`;
+      const googleAuthUrl = `${baseURL}/api/auth/google?redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&action=signup`;
+      window.location.href = googleAuthUrl;
+    } catch (err: unknown) {
+      console.error("Google signup error:", err);
+      setError("Failed to initiate Google signup. Please try again.");
+      setIsLoading(false);
+    }
+  };
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
@@ -115,13 +135,16 @@ const Example = () => {
               Sign up to see photos and videos from your friends.
             </p>
 
-            {/* Facebook Button - First */}
             <button
               type="button"
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-[#1877F2] px-4 py-2 text-base font-semibold text-white hover:bg-[#166FE5] transition-colors"
+              onClick={handleGoogleSignup}
+              disabled={isLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-[#1877F2] px-4 py-2 text-base font-semibold text-white hover:bg-[#166FE5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Facebook className="h-5 w-5" />
-              <span>Log in with Facebook</span>
+              <FaGoogle className="h-5 w-5" />
+              <span>
+                {isLoading ? "Redirecting..." : "Sign up with Google"}
+              </span>
             </button>
 
             {/* OR Separator */}
