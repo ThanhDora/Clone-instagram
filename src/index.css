@@ -67,15 +67,15 @@
   }
 
   [data-slot="tabs-trigger"][data-state="active"] {
-    color: white;
+    color: hsl(var(--foreground));
   }
 
   [data-slot="tabs-trigger"][data-state="active"] svg {
-    color: white;
+    color: hsl(var(--foreground));
   }
 
   [data-slot="tabs-trigger"][data-state="inactive"] svg {
-    color: #9ca3af;
+    color: hsl(var(--muted-foreground));
   }
 
   [data-slot="tabs-trigger"][data-state="active"] {

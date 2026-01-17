@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import {
   Home,
@@ -20,6 +20,7 @@ import {
   ImageIcon,
   Sparkles,
   Instagram,
+  RefreshCw,
 } from "lucide-react";
 import {
   TbApps,
@@ -27,7 +28,7 @@ import {
   TbBrandThreads,
   TbBrandMeta,
 } from "react-icons/tb";
-
+import Switch from "@/Components/Switch";
 import { cn, getImageUrl } from "@/lib/utils";
 import { useTheme } from "@/hooks/useTheme";
 import httpsRequest from "@/utils/httpsRequest";
@@ -39,14 +40,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/Components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-} from "@/Components/ui/dialog";
 import { useNotificationsSheet } from "@/Context/NotificationsSheetContext";
 import { useSearchSheet } from "@/Context/SearchSheetContext";
+import { useCreateDialog } from "@/Context/CreateDialogContext";
 
 const navigation = [
   { name: "Home", href: "/", icon: Home },
@@ -56,21 +52,22 @@ const navigation = [
   { name: "Messages", href: "/messages", icon: MessageCircle },
   { name: "Notifications", href: null, icon: Heart, isSheet: true },
   { name: "Create", href: null, icon: PlusSquare, isDialog: true },
-  { name: "Profile", href: "/profile", icon: User, isProfile: true },
+  { name: "Profile", href: null, icon: User, isProfile: true },
 ];
 
 export default function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const [isPostDialogOpen, setIsPostDialogOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<TUser | null>(null);
   const { openSheet: openNotificationsSheet, isOpen: isNotificationsOpen } =
     useNotificationsSheet();
   const { openSheet: openSearchSheet, isOpen: isSearchOpen } = useSearchSheet();
+  const { openDialog: openCreateDialog } = useCreateDialog();
   const isCollapsed = isNotificationsOpen || isSearchOpen;
 
   const handlePostClick = () => {
-    setIsPostDialogOpen(true);
+    openCreateDialog();
   };
 
   useEffect(() => {
@@ -220,6 +217,68 @@ export default function Sidebar() {
             );
           }
 
+          if (isProfile) {
+            const handleProfileClick = (e: React.MouseEvent) => {
+              e.preventDefault();
+              if (currentUser?.username) {
+                navigate(`/profile/${currentUser.username}`);
+              } else {
+                navigate("/profile");
+              }
+            };
+
+            return (
+              <button
+                key={item.name}
+                onClick={handleProfileClick}
+                className={cn(
+                  "flex w-full items-center rounded-lg text-base font-medium transition-all duration-200 px-4 py-3",
+                  location.pathname === "/profile" ||
+                    (currentUser?.username &&
+                      location.pathname === `/profile/${currentUser.username}`)
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.02] active:scale-[0.98]"
+                )}
+              >
+                {isProfile ? (
+                  currentUserAvatar ? (
+                    <img
+                      src={currentUserAvatar}
+                      alt="Profile"
+                      className="h-6 w-6 rounded-full object-cover shrink-0 transition-transform duration-200 hover:scale-110"
+                      crossOrigin="anonymous"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                        const fallback =
+                          target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = "flex";
+                      }}
+                    />
+                  ) : null
+                ) : null}
+                {isProfile && !currentUserAvatar && (
+                  <div className="h-6 w-6 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold text-xs shrink-0 transition-transform duration-200 hover:scale-110">
+                    {currentUserInitial}
+                  </div>
+                )}
+                {!isProfile && (
+                  <item.icon className="h-6 w-6 shrink-0 transition-transform duration-200 hover:scale-110" />
+                )}
+                <span
+                  className={cn(
+                    "transition-all duration-500 ease-in-out overflow-hidden whitespace-nowrap",
+                    isCollapsed
+                      ? "w-0 opacity-0 ml-0"
+                      : "w-auto opacity-100 ml-3"
+                  )}
+                >
+                  {item.name}
+                </span>
+              </button>
+            );
+          }
+
           return (
             <Link
               key={item.name}
@@ -231,27 +290,6 @@ export default function Sidebar() {
                   : "text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.02] active:scale-[0.98]"
               )}
             >
-              {isProfile ? (
-                currentUserAvatar ? (
-                  <img
-                    src={currentUserAvatar}
-                    alt="Profile"
-                    className="h-6 w-6 rounded-full object-cover shrink-0 transition-transform duration-200 hover:scale-110"
-                    crossOrigin="anonymous"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                      const fallback = target.nextElementSibling as HTMLElement;
-                      if (fallback) fallback.style.display = "flex";
-                    }}
-                  />
-                ) : null
-              ) : null}
-              {isProfile && !currentUserAvatar && (
-                <div className="h-6 w-6 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold text-xs shrink-0 transition-transform duration-200 hover:scale-110">
-                  {currentUserInitial}
-                </div>
-              )}
               {!isProfile && (
                 <item.icon className="h-6 w-6 shrink-0 transition-transform duration-200 hover:scale-110" />
               )}
@@ -284,21 +322,21 @@ export default function Sidebar() {
           </PopoverTrigger>
           <PopoverContent className="w-64 p-0" align="start">
             <div className="py-2 flex flex-col gap-1.5 items-center">
-              <button className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground">
+              <button className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground cursor-pointer">
                 <Settings className="h-5 w-5" />
                 <span>Settings</span>
               </button>
-              <button className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground">
+              <button className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground cursor-pointer">
                 <BarChart3 className="h-5 w-5" />
                 <span>Your Activity</span>
               </button>
-              <button className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground">
+              <button className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground cursor-pointer">
                 <Bookmark className="h-5 w-5" />
                 <span>Saved</span>
               </button>
               <button
                 onClick={toggleTheme}
-                className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground"
+                className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground cursor-pointer"
               >
                 {theme === "dark" ? (
                   <>
@@ -312,14 +350,17 @@ export default function Sidebar() {
                   </>
                 )}
               </button>
-              <button className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground">
+              <button className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground cursor-pointer">
                 <AlertCircle className="h-5 w-5" />
                 <span>Report a problem</span>
               </button>
             </div>
             <div className="flex flex-col gap-1.5 items-center">
-              <button className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground">
-                <span>Switch accounts</span>
+              <button className="flex w-[90%] rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground cursor-pointer">
+                <RefreshCw className="h-5 w-5" />
+                <span>
+                  <Switch trigger={<span>Switch accounts</span>} />
+                </span>
               </button>
               <button
                 onClick={() => {
@@ -328,7 +369,7 @@ export default function Sidebar() {
                   localStorage.removeItem("user");
                   window.location.href = "/login";
                 }}
-                className="flex w-[90%] mb-2 rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground bg-muted/50"
+                className="flex w-[90%] mb-2 rounded-lg items-center gap-3 px-4 py-3 text-left text-base hover:bg-blue-50/20 font-medium text-foreground bg-muted/50 cursor-pointer"
               >
                 <span>Log out</span>
               </button>
@@ -389,26 +430,6 @@ export default function Sidebar() {
           </PopoverContent>
         </Popover>
       </div>
-
-      <Dialog open={isPostDialogOpen} onOpenChange={setIsPostDialogOpen}>
-        <DialogContent
-          className="sm:max-w-4xl max-h-[90vh] bg-card backdrop-blur-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-bottom-4 duration-300 ease-out"
-          style={{ backgroundColor: "hsl(var(--card))" }}
-          showCloseButton={false}
-        >
-          <DialogTitle className="text-center py-4 border-b border-border text-lg font-semibold">
-            Create new post
-          </DialogTitle>
-          <DialogDescription className="sr-only">
-            Create and share a new post
-          </DialogDescription>
-          <div className="py-8">
-            <div className="flex flex-col items-center justify-center gap-4 min-h-[400px]">
-              <p className="text-muted-foreground">Post content here</p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

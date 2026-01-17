@@ -10,6 +10,7 @@ import type {
   TSuggestedUsersResponse,
   TSuggestedUser,
 } from "@/Type/Users";
+import Loading from "./Loading";
 
 export default function Profile() {
   const [currentUser, setCurrentUser] = useState<TUser | null>(null);
@@ -116,7 +117,7 @@ export default function Profile() {
     return (
       <div className="space-y-4">
         <div className="rounded-lg bg-card p-4">
-          <div className="text-sm text-muted-foreground">Loading...</div>
+          <Loading />
         </div>
       </div>
     );
@@ -137,7 +138,14 @@ export default function Profile() {
             username={currentUser.username}
           />
           <div className="flex-1 min-w-0">
-            <Link to="/profile" className="font-semibold truncate">
+            <Link
+              to={
+                currentUser?.username
+                  ? `/profile/${currentUser.username}`
+                  : "/profile"
+              }
+              className="font-semibold truncate"
+            >
               {currentUser.username}
             </Link>
             <p className="text-sm text-muted-foreground truncate">
@@ -156,7 +164,7 @@ export default function Profile() {
         </div>
         {isLoadingSuggestions ? (
           <div className="mt-4 text-sm text-muted-foreground">
-            Loading suggestions...
+            <Loading />
           </div>
         ) : suggestions.length > 0 ? (
           <div className="space-y-3 mt-4">
@@ -168,7 +176,7 @@ export default function Profile() {
                 />
                 <div className="flex-1">
                   <Link
-                    to={`/profile/${user._id}`}
+                    to={`/profile/${user.username}`}
                     className="text-sm font-medium hover:underline"
                   >
                     {user.username}

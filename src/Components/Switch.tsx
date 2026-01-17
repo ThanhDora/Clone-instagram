@@ -23,7 +23,12 @@ import {
 } from "@/Components/ui/form";
 import { Input } from "@/Components/ui/input";
 import { PasswordInput } from "@/Components/ui/password-input";
-import type { TLoginRequest, TLoginResponse, TAuthError } from "@/Type/Users";
+import type {
+  TLoginRequest,
+  TLoginResponse,
+  TAuthError,
+  TUser,
+} from "@/Type/Users";
 import httpsRequest from "@/utils/httpsRequest";
 
 export const title = "Signin";
@@ -66,30 +71,146 @@ const Example = ({ open, onOpenChange, trigger }: SwitchProps) => {
         "/api/auth/login",
         values
       );
-      const data = response.data.data;
 
-      if (!data || !data.accessToken) {
-        console.error("Invalid login response:", data);
-        throw new Error("Invalid response from server");
+      // Kiểm tra response structure
+      if (!response.data) {
+        console.error("No response data");
+        setError("No response from server. Please try again.");
+        return;
       }
 
-      // Lưu cả access_token và token để tương thích
-      localStorage.setItem("access_token", data.accessToken);
-      localStorage.setItem("token", data.accessToken);
-      localStorage.setItem("refresh_token", data.refreshToken);
-
-      if (data.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
+      // Kiểm tra success flag
+      if (response.data.success === false) {
+        const errorMsg = response.data.message || "Login failed";
+        console.error("Login failed:", errorMsg);
+        setError(errorMsg);
+        return;
       }
 
-      navigate("/");
-      window.location.reload();
+      // Thử nhiều cách để lấy data
+      const responseData = response.data;
+      const data = responseData.data;
+      let accessToken: string | undefined;
+      let refreshToken: string | undefined;
+      let user: TUser | undefined;
+
+      // Case 1: Standard structure { success, message, data: { accessToken, refreshToken, user } }
+      if (data && typeof data === "object" && "accessToken" in data) {
+        accessToken = data.accessToken;
+        refreshToken = data.refreshToken;
+        user = data.user;
+      }
+      // Case 2: Direct structure { success, message, accessToken, refreshToken, user }
+      else if ("accessToken" in responseData) {
+        const directData = responseData as unknown as {
+          accessToken?: string;
+          refreshToken?: string;
+          user?: TUser;
+        };
+        accessToken = directData.accessToken;
+        refreshToken = directData.refreshToken;
+        user = directData.user;
+      }
+      // Case 3: Nested in data but different structure (e.g., data.tokens.accessToken)
+      else if (data && typeof data === "object") {
+        const altData = data as Record<string, unknown>;
+
+        // Try to get from tokens object
+        if (altData.tokens && typeof altData.tokens === "object") {
+          const tokens = altData.tokens as Record<string, unknown>;
+          accessToken = (tokens.accessToken ||
+            tokens.access_token ||
+            tokens.token) as string | undefined;
+          refreshToken = (tokens.refreshToken || tokens.refresh_token) as
+            | string
+            | undefined;
+        }
+
+        // Try alternative field names directly in data
+        if (!accessToken) {
+          accessToken = (altData.accessToken ||
+            altData.access_token ||
+            altData.token) as string | undefined;
+          refreshToken = (altData.refreshToken || altData.refresh_token) as
+            | string
+            | undefined;
+        }
+
+        user = altData.user as TUser | undefined;
+      }
+
+      if (!accessToken) {
+        console.error("No accessToken found in any structure:", {
+          responseData: response.data,
+          data: data,
+          allKeys: Object.keys(response.data || {}),
+        });
+        setError("Invalid response structure from server. Please try again.");
+        return;
+      }
+
+      // Clear tất cả dữ liệu cũ trước khi lưu dữ liệu mới
+      localStorage.removeItem("token");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("user");
+
+      // Lưu dữ liệu mới
+      localStorage.setItem("access_token", accessToken);
+      localStorage.setItem("token", accessToken);
+      if (refreshToken) {
+        localStorage.setItem("refresh_token", refreshToken);
+      }
+
+      if (user) {
+        localStorage.setItem("user", JSON.stringify(user));
+      }
+
+      // Reset form và đóng dialog
+      form.reset();
+      if (onOpenChange) {
+        onOpenChange(false);
+      }
+
+      // Navigate và reload để cập nhật state
+      navigate("/", { replace: true });
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: TAuthError } };
-      const errorData: TAuthError = axiosError.response?.data || {
-        message: "An error occurred. Please try again.",
+      console.error("Login error:", err);
+      const axiosError = err as {
+        response?: {
+          status?: number;
+          data?: TAuthError | { message?: string };
+        };
+        message?: string;
       };
-      setError(errorData.message || "Login failed");
+
+      // Extract error message from different possible structures
+      let errorMessage = "An error occurred. Please try again.";
+
+      if (axiosError.response?.data) {
+        const errorData = axiosError.response.data;
+        if (typeof errorData === "object" && "message" in errorData) {
+          errorMessage = errorData.message || errorMessage;
+        } else if (typeof errorData === "string") {
+          errorMessage = errorData;
+        }
+      } else if (axiosError.message) {
+        errorMessage = axiosError.message;
+      }
+
+      // Handle specific HTTP status codes
+      if (axiosError.response?.status === 401) {
+        errorMessage = "Invalid email or password. Please try again.";
+      } else if (axiosError.response?.status === 400) {
+        errorMessage = "Invalid request. Please check your input.";
+      } else if (axiosError.response?.status === 500) {
+        errorMessage = "Server error. Please try again later.";
+      }
+
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

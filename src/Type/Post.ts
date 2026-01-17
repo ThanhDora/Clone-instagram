@@ -1,6 +1,11 @@
 export interface Post {
   _id: string;
-  userId?: string;
+  userId?: string | {
+    _id: string;
+    username: string;
+    fullName?: string;
+    profilePicture?: string;
+  };
   caption?: string;
   image?: string;
   video?: string;
@@ -8,6 +13,8 @@ export interface Post {
   likes: number;
   comments: number;
   createdAt: string;
+  isLiked?: boolean;
+  isSaved?: boolean;
   user?: {
     _id: string;
     username: string;
@@ -26,6 +33,20 @@ export type TGetUserPostsResponse = {
       totalPages: number;
       totalPosts: number;
       hasMore: boolean;
+    };
+  };
+};
+
+export type TGetFeedResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    posts: Post[];
+    pagination?: {
+      currentPage?: number;
+      totalPages?: number;
+      totalPosts?: number;
+      hasMore?: boolean;
     };
   };
 };

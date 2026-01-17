@@ -1,9 +1,12 @@
+import { lazy, Suspense } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Profile from "@/Components/Profile";
 import { useNotificationsSheet } from "@/Context/NotificationsSheetContext";
 import { useSearchSheet } from "@/Context/SearchSheetContext";
 import { cn } from "@/lib/utils";
+
+const FloatingMessages = lazy(() => import("@/Components/FloatingMessages"));
 
 export default function MainLayout() {
   const location = useLocation();
@@ -35,6 +38,9 @@ export default function MainLayout() {
           )}
         </div>
       </main>
+      <Suspense fallback={null}>
+        <FloatingMessages />
+      </Suspense>
     </div>
   );
 }

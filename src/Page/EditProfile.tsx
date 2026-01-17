@@ -355,7 +355,7 @@ export default function EditProfile() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                className="w-full justify-between bg-input/30"
+                className="w-full justify-between bg-input/30 cursor-pointer"
               >
                 {gender
                   ? gender.charAt(0).toUpperCase() + gender.slice(1)
@@ -364,6 +364,7 @@ export default function EditProfile() {
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
               <DropdownMenuRadioGroup
+                className="text-foreground bg-gray-400 text-white rounded-2xl cursor-pointer"
                 value={gender}
                 onValueChange={(value) =>
                   setGender(value as "male" | "female" | "other" | "")

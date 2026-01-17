@@ -170,7 +170,11 @@ export default function SearchSheet() {
       if (searchQuery.trim() && username) {
         saveSearchHistory(userId, searchQuery.trim());
       }
-      navigate(`/profile/${userId}`);
+      if (username) {
+        navigate(`/profile/${username}`);
+      } else {
+        navigate(`/profile/${userId}`);
+      }
       closeSheet();
     },
     [navigate, closeSheet, searchQuery, saveSearchHistory]
@@ -202,49 +206,23 @@ export default function SearchSheet() {
 
   const handleHistoryItemClick = useCallback(
     (item: TSearchHistoryItem) => {
-      let userId: string | null = null;
+      let username: string | null = null;
 
       if (item.searchedUser) {
         if (
           typeof item.searchedUser === "object" &&
           item.searchedUser !== null
         ) {
-          const userObj = item.searchedUser as { _id?: unknown };
-          if (userObj._id) {
-            if (typeof userObj._id === "string") {
-              userId = userObj._id;
-            } else if (
-              typeof userObj._id === "object" &&
-              userObj._id !== null &&
-              "toString" in userObj._id
-            ) {
-              userId = (userObj._id as { toString: () => string }).toString();
-            } else {
-              userId = String(userObj._id);
-            }
+          const userObj = item.searchedUser as { username?: string };
+          if (userObj.username) {
+            username = userObj.username;
           }
-        } else if (typeof item.searchedUser === "string") {
-          userId = item.searchedUser;
-        }
-      } else if (item.searchedUserId) {
-        if (typeof item.searchedUserId === "string") {
-          userId = item.searchedUserId;
-        } else if (
-          typeof item.searchedUserId === "object" &&
-          item.searchedUserId !== null &&
-          "toString" in item.searchedUserId
-        ) {
-          userId = (
-            item.searchedUserId as { toString: () => string }
-          ).toString();
-        } else {
-          userId = String(item.searchedUserId);
         }
       }
 
-      if (userId && userId !== "[object Object]") {
+      if (username) {
         setSearchQuery(item.searchQuery);
-        navigate(`/profile/${userId}`);
+        navigate(`/profile/${username}`);
         closeSheet();
       } else {
         setSearchQuery(item.searchQuery);

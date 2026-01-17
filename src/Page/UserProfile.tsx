@@ -8,6 +8,8 @@ import {
   Camera,
   CircleUser,
   Link2,
+  Heart,
+  MessageCircle,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/Components/ui/button";
@@ -25,7 +27,7 @@ import type { TGetUserPostsResponse, Post } from "@/Type/Post";
 
 export default function UserProfile() {
   const navigate = useNavigate();
-  const { userId } = useParams<{ userId?: string }>();
+  const { username: usernameFromUrl } = useParams<{ username?: string }>();
   const [showFullBio, setShowFullBio] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const bioRef = useRef<HTMLParagraphElement>(null);
@@ -39,8 +41,27 @@ export default function UserProfile() {
   const [activeTab, setActiveTab] = useState("posts");
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowingLoading, setIsFollowingLoading] = useState(false);
+  const [currentUserUsername, setCurrentUserUsername] = useState<string | null>(
+    null
+  );
 
-  const isViewingOwnProfile = !userId;
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setCurrentUserUsername(user.username || null);
+      } catch {
+        setCurrentUserUsername(null);
+      }
+    }
+  }, []);
+
+  const isViewingOwnProfile =
+    !usernameFromUrl ||
+    (usernameFromUrl &&
+      currentUserUsername &&
+      usernameFromUrl === currentUserUsername);
 
   const fetchUserProfile = useCallback(
     async (skipLoading = false) => {
@@ -91,12 +112,53 @@ export default function UserProfile() {
             setUserData(profileData);
           }
         } else {
-          response = await httpsRequest.get<TGetUserByIdResponse>(
-            `/api/users/${userId}`
-          );
-          const data = response.data.data;
-          setUserData(data);
-          setIsFollowing(data.isFollowing ?? false);
+          // Fetch user by username using search API first
+          try {
+            const searchResponse = await httpsRequest.get<{
+              success: boolean;
+              data: Array<{
+                _id: string;
+                username: string;
+                fullName?: string;
+                profilePicture?: string;
+              }>;
+            }>(`/api/users/search`, {
+              params: {
+                q: usernameFromUrl,
+                limit: 1,
+              },
+            });
+
+            const foundUser = searchResponse.data.data?.find(
+              (u) => u.username === usernameFromUrl
+            );
+
+            if (foundUser) {
+              // Fetch full user details by ID
+              response = await httpsRequest.get<TGetUserByIdResponse>(
+                `/api/users/${foundUser._id}`
+              );
+              const data = response.data.data;
+              setUserData(data);
+              setIsFollowing(data.isFollowing ?? false);
+            } else {
+              throw new Error("User not found");
+            }
+          } catch {
+            // If search fails, try direct username endpoint (if exists)
+            try {
+              response = await httpsRequest.get<TGetUserByIdResponse>(
+                `/api/users/username/${usernameFromUrl}`
+              );
+              const data = response.data.data;
+              setUserData(data);
+              setIsFollowing(data.isFollowing ?? false);
+            } catch (usernameError) {
+              // If all fails, show error
+              console.error("Failed to fetch user:", usernameError);
+              setError("User not found");
+            }
+          }
         }
       } catch (err: unknown) {
         const axiosError = err as {
@@ -124,14 +186,14 @@ export default function UserProfile() {
         }
       }
     },
-    [userId, isViewingOwnProfile, navigate]
+    [usernameFromUrl, isViewingOwnProfile, navigate]
   );
 
   const fetchUserPosts = useCallback(
     async (filter: "all" | "video" | "saved" = "all") => {
       if (!userData) return;
 
-      const targetUserId = userId || userData._id;
+      const targetUserId = userData._id;
       setIsLoadingPosts(true);
 
       try {
@@ -145,19 +207,58 @@ export default function UserProfile() {
             },
           }
         );
-        setPosts(response.data.data.posts);
+
+        let postsData: Post[] = [];
+        if (response?.data) {
+          if (response.data.data && Array.isArray(response.data.data.posts)) {
+            postsData = response.data.data.posts;
+          } else if (Array.isArray(response.data.data)) {
+            postsData = response.data.data;
+          } else if (Array.isArray(response.data)) {
+            postsData = response.data;
+          }
+        }
+
+        setPosts(postsData);
       } catch (err: unknown) {
+        const axiosError = err as {
+          response?: { status?: number; data?: TAuthError };
+          message?: string;
+        };
+
+        if (axiosError.response?.status === 401) {
+          if (isViewingOwnProfile) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("refresh_token");
+            localStorage.removeItem("user");
+            navigate("/login", { replace: true });
+            return;
+          }
+        }
+
         console.error("Failed to fetch posts:", err);
+        setPosts([]);
       } finally {
         setIsLoadingPosts(false);
       }
     },
-    [userData, userId]
+    [userData, isViewingOwnProfile, navigate]
   );
 
   useEffect(() => {
     fetchUserProfile();
   }, [fetchUserProfile]);
+
+  // Redirect to /profile/{username} if viewing own profile without username in URL
+  useEffect(() => {
+    if (isViewingOwnProfile && userData?.username) {
+      const currentPath = window.location.pathname;
+      if (currentPath === "/profile") {
+        navigate(`/profile/${userData.username}`, { replace: true });
+      }
+    }
+  }, [isViewingOwnProfile, userData?.username, navigate]);
 
   useEffect(() => {
     if (userData && !isViewingOwnProfile && "isFollowing" in userData) {
@@ -185,7 +286,7 @@ export default function UserProfile() {
   }, [userData?.bio]);
 
   const handleFollow = async () => {
-    if (!userId || !userData) return;
+    if (!usernameFromUrl || !userData) return;
 
     const currentUserStr = localStorage.getItem("user");
     let currentUserId: string | null = null;
@@ -198,7 +299,7 @@ export default function UserProfile() {
       }
     }
 
-    if (currentUserId && userId === currentUserId) {
+    if (currentUserId && userData._id === currentUserId) {
       setError("You cannot follow yourself");
       return;
     }
@@ -206,7 +307,7 @@ export default function UserProfile() {
     setIsFollowingLoading(true);
     setError(null);
     try {
-      await httpsRequest.post(`/api/follow/${userId}/follow`, {});
+      await httpsRequest.post(`/api/follow/${userData._id}/follow`, {});
       await fetchUserProfile(true);
     } catch (err: unknown) {
       const axiosError = err as {
@@ -258,12 +359,12 @@ export default function UserProfile() {
   };
 
   const handleUnfollow = async () => {
-    if (!userId || !userData) return;
+    if (!usernameFromUrl || !userData) return;
 
     setIsFollowingLoading(true);
     setError(null);
     try {
-      await httpsRequest.delete(`/api/follow/${userId}/follow`);
+      await httpsRequest.delete(`/api/follow/${userData._id}/follow`);
       await fetchUserProfile(true);
     } catch (err: unknown) {
       console.error("Unfollow error:", err);
@@ -416,14 +517,14 @@ export default function UserProfile() {
                 <span className="text-sm text-muted-foreground">Posts</span>
               </div>
               <Link
-                to={`/followers${userId ? `/${userId}` : ""}`}
+                to={`/followers${usernameFromUrl ? `/${usernameFromUrl}` : ""}`}
                 className="flex items-center gap-1"
               >
                 <span className="font-medium">{followersCount}</span>
                 <span className="text-sm text-muted-foreground">Followers</span>
               </Link>
               <Link
-                to={`/following${userId ? `/${userId}` : ""}`}
+                to={`/following${usernameFromUrl ? `/${usernameFromUrl}` : ""}`}
                 className="flex items-center gap-1"
               >
                 <span className="font-medium">{followingCount}</span>
@@ -492,14 +593,14 @@ export default function UserProfile() {
           <div className="flex items-center gap-2 mt-4">
             <Button
               variant="outline"
-              className="w-60 h-13 border-none shadow-none bg-(--primary-background)/90 hover:bg-(--primary-background-hover) rounded-2xl cursor-pointer"
+              className="w-60 h-13 border-none shadow-none bg-gray-400 hover:bg-gray-600 text-white rounded-2xl cursor-pointer"
               onClick={() => navigate("/edit-profile")}
             >
               Edit Profile
             </Button>
             <Button
               variant="outline"
-              className="w-60 h-13 border-none shadow-none bg-(--primary-background)/90 hover:bg-(--primary-background-hover) rounded-2xl cursor-pointer"
+              className="w-60 h-13 border-none shadow-none bg-gray-400 hover:bg-gray-600 text-white rounded-2xl cursor-pointer"
             >
               View archive
             </Button>
@@ -508,7 +609,7 @@ export default function UserProfile() {
           <div className="flex items-center gap-2 mt-4">
             <Button
               variant="outline"
-              className="w-60 h-13 border-none shadow-none bg-(--primary-background)/90 hover:bg-(--primary-background-hover) rounded-2xl cursor-pointer"
+              className="w-60 h-13 border-none shadow-none bg-gray-400 hover:bg-gray-600 text-white rounded-2xl cursor-pointer"
               onClick={isFollowing ? handleUnfollow : handleFollow}
               disabled={isFollowingLoading}
             >
@@ -520,7 +621,7 @@ export default function UserProfile() {
             </Button>
             <Button
               variant="outline"
-              className="w-60 h-13 border-none shadow-none bg-(--primary-background)/90 hover:bg-(--primary-background-hover) rounded-2xl cursor-pointer"
+              className="w-60 h-13 border-none shadow-none bg-gray-400 hover:bg-gray-600 text-white rounded-2xl cursor-pointer"
             >
               Message
             </Button>
@@ -539,15 +640,15 @@ export default function UserProfile() {
           >
             <TabsList className="w-full justify-center bg-transparent h-auto p-0 gap-0 border-none relative">
               <TabsTrigger value="posts" className="flex-1 relative">
-                <Grid3x3 className="h-10 w-10" />
+                <Grid3x3 className="h-10 w-10 text-foreground data-[state=inactive]:text-muted-foreground" />
               </TabsTrigger>
               {isViewingOwnProfile && (
                 <TabsTrigger value="saved" className="flex-1 relative">
-                  <Bookmark className="h-10 w-10" />
+                  <Bookmark className="h-10 w-10 text-foreground data-[state=inactive]:text-muted-foreground" />
                 </TabsTrigger>
               )}
               <TabsTrigger value="tagged" className="flex-1 relative">
-                <User className="h-10 w-10" />
+                <User className="h-10 w-10 text-foreground data-[state=inactive]:text-muted-foreground" />
               </TabsTrigger>
             </TabsList>
             <div className="border-b border-border/50 mt-[-15px]"></div>
@@ -558,26 +659,59 @@ export default function UserProfile() {
                 </div>
               ) : posts.length > 0 ? (
                 <div className="grid grid-cols-3 gap-1 mt-4">
-                  {posts.map((post) => (
-                    <div
-                      key={post._id}
-                      className="aspect-square relative cursor-pointer group"
-                    >
-                      <img
-                        src={post.image || post.video || ""}
-                        alt={post.caption || ""}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <div className="flex items-center gap-4 text-white">
-                          <span className="font-semibold">❤️ {post.likes}</span>
-                          <span className="font-semibold">
-                            💬 {post.comments}
-                          </span>
+                  {posts.map((post) => {
+                    const imageUrl = post.image || post.video || "";
+                    const baseURL =
+                      import.meta.env.VITE_BASE_URL ||
+                      "https://instagram.f8team.dev";
+                    const getPostImageUrl = (url: string): string => {
+                      if (!url || url.trim() === "") return "";
+                      if (
+                        url.startsWith("http://") ||
+                        url.startsWith("https://")
+                      )
+                        return url;
+                      if (url.startsWith("/")) return `${baseURL}${url}`;
+                      return `${baseURL}/${url}`;
+                    };
+
+                    return (
+                      <div
+                        key={post._id}
+                        className="aspect-square relative cursor-pointer group"
+                      >
+                        {post.mediaType === "video" ? (
+                          <video
+                            src={getPostImageUrl(imageUrl)}
+                            className="w-full h-full object-cover"
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <img
+                            src={getPostImageUrl(imageUrl)}
+                            alt={post.caption || ""}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = "none";
+                            }}
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <div className="flex items-center gap-4 text-white">
+                            <span className="font-semibold flex items-center gap-1">
+                              <Heart className="h-5 w-5" /> {post.likes || 0}
+                            </span>
+                            <span className="font-semibold flex items-center gap-1">
+                              <MessageCircle className="h-5 w-5" />{" "}
+                              {post.comments || 0}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="py-10 flex items-center flex-col gap-4">
@@ -606,18 +740,48 @@ export default function UserProfile() {
                   </div>
                 ) : posts.length > 0 ? (
                   <div className="grid grid-cols-3 gap-1 mt-4">
-                    {posts.map((post) => (
-                      <div
-                        key={post._id}
-                        className="aspect-square relative cursor-pointer group"
-                      >
-                        <img
-                          src={post.image || post.video || ""}
-                          alt={post.caption || ""}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ))}
+                    {posts.map((post) => {
+                      const imageUrl = post.image || post.video || "";
+                      const baseURL =
+                        import.meta.env.VITE_BASE_URL ||
+                        "https://instagram.f8team.dev";
+                      const getPostImageUrl = (url: string): string => {
+                        if (!url || url.trim() === "") return "";
+                        if (
+                          url.startsWith("http://") ||
+                          url.startsWith("https://")
+                        )
+                          return url;
+                        if (url.startsWith("/")) return `${baseURL}${url}`;
+                        return `${baseURL}/${url}`;
+                      };
+
+                      return (
+                        <div
+                          key={post._id}
+                          className="aspect-square relative cursor-pointer group"
+                        >
+                          {post.mediaType === "video" ? (
+                            <video
+                              src={getPostImageUrl(imageUrl)}
+                              className="w-full h-full object-cover"
+                              muted
+                              playsInline
+                            />
+                          ) : (
+                            <img
+                              src={getPostImageUrl(imageUrl)}
+                              alt={post.caption || ""}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = "none";
+                              }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="py-10 flex items-center flex-col gap-4">
