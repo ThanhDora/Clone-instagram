@@ -1,7 +1,7 @@
-import { ReactNode, MouseEvent } from "react";
-import { Link as ReactRouterLink, useNavigate, To } from "react-router-dom";
+import type { ReactNode, MouseEvent } from "react";
+import { Link as ReactRouterLink, useNavigate } from "react-router-dom";
+import type { To } from "react-router-dom";
 import { useNavigation } from "@/Context/NavigationContext";
-import { cn } from "@/lib/utils";
 
 interface NavigationLinkProps {
   to: To;
