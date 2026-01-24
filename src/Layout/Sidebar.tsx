@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import NavigationLink from "@/Components/NavigationLink";
 import { useState, useEffect } from "react";
 import {
   Home,
@@ -43,6 +44,7 @@ import {
 import { useNotificationsSheet } from "@/Context/NotificationsSheetContext";
 import { useSearchSheet } from "@/Context/SearchSheetContext";
 import { useCreateDialog } from "@/Context/CreateDialogContext";
+import { useNavigation } from "@/Context/NavigationContext";
 
 const navigation = [
   { name: "Home", href: "/", icon: Home },
@@ -64,6 +66,7 @@ export default function Sidebar() {
     useNotificationsSheet();
   const { openSheet: openSearchSheet, isOpen: isSearchOpen } = useSearchSheet();
   const { openDialog: openCreateDialog } = useCreateDialog();
+  const { setIsNavigating } = useNavigation();
   const isCollapsed = isNotificationsOpen || isSearchOpen;
 
   const handlePostClick = () => {
@@ -106,7 +109,7 @@ export default function Sidebar() {
   return (
     <div className="flex h-full flex-col p-4">
       <div className="mb-8 px-4 h-20 flex items-center">
-        <Link
+        <NavigationLink
           to="/"
           className="w-full relative flex items-center justify-center"
         >
@@ -134,7 +137,7 @@ export default function Sidebar() {
               <Instagram />
             </div>
           </div>
-        </Link>
+        </NavigationLink>
       </div>
       <nav className="flex-1 space-y-2">
         {navigation.map((item) => {
@@ -218,12 +221,24 @@ export default function Sidebar() {
           }
 
           if (isProfile) {
-            const handleProfileClick = (e: React.MouseEvent) => {
+            const handleProfileClick = async (e: React.MouseEvent) => {
               e.preventDefault();
-              if (currentUser?.username) {
-                navigate(`/profile/${currentUser.username}`);
-              } else {
-                navigate("/profile");
+              setIsNavigating(true);
+              
+              try {
+                await import("@/Page/UserProfile");
+                if (currentUser?.username) {
+                  navigate(`/profile/${currentUser.username}`);
+                } else {
+                  navigate("/profile");
+                }
+              } catch (error) {
+                console.error("Failed to preload profile:", error);
+                if (currentUser?.username) {
+                  navigate(`/profile/${currentUser.username}`);
+                } else {
+                  navigate("/profile");
+                }
               }
             };
 
@@ -280,7 +295,7 @@ export default function Sidebar() {
           }
 
           return (
-            <Link
+            <NavigationLink
               key={item.name}
               to={item.href || "/"}
               className={cn(
@@ -301,7 +316,7 @@ export default function Sidebar() {
               >
                 {item.name}
               </span>
-            </Link>
+            </NavigationLink>
           );
         })}
       </nav>

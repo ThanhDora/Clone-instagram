@@ -1,14 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Dialog, DialogContent } from "@/Components/ui/dialog";
-import { Heart, MessageCircle, Send, Bookmark } from "lucide-react";
+import { Heart, MessageCircle, Send, Bookmark, MoreVertical, Edit, Trash2 } from "lucide-react";
 import type { Post } from "@/Type/Post";
-import type { TGetUserByIdResponse } from "@/Type/Users";
+import type { TGetUserByIdResponse, TAuthError } from "@/Type/Users";
 import httpsRequest from "@/utils/httpsRequest";
 import { getImageUrl } from "@/lib/utils";
 import { Button } from "@/Components/ui/button";
 import { Textarea } from "@/Components/ui/textarea";
 import { useSocket } from "@/Context/SocketContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/Components/ui/dropdown-menu";
 
 interface PostDetailsProps {
   post: Post | null;
@@ -20,13 +26,13 @@ interface PostDetailsProps {
 interface Comment {
   _id: string;
   userId:
-    | string
-    | {
-        _id: string;
-        username: string;
-        fullName?: string;
-        profilePicture?: string;
-      };
+  | string
+  | {
+    _id: string;
+    username: string;
+    fullName?: string;
+    profilePicture?: string;
+  };
   content: string;
   createdAt: string;
   likes?: number;
@@ -39,6 +45,7 @@ export default function PostDetails({
   onOpenChange,
   onPostUpdate,
 }: PostDetailsProps) {
+  const navigate = useNavigate();
   const [comments, setComments] = useState<Comment[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [newComment, setNewComment] = useState("");
@@ -48,6 +55,11 @@ export default function PostDetails({
   const [likes, setLikes] = useState(post?.likes ?? 0);
   const [isLiking, setIsLiking] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editCaption, setEditCaption] = useState("");
+  const [isMediaFullscreen, setIsMediaFullscreen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{
     _id: string;
     username: string;
@@ -83,12 +95,33 @@ export default function PostDetails({
   };
 
   useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setCurrentUserId(user._id || user.id || null);
+      } catch {
+        setCurrentUserId(null);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (post) {
       setIsLiked(post.isLiked ?? false);
       setIsSaved(post.isSaved ?? false);
       setLikes(post.likes ?? 0);
+      setEditCaption(post.caption || "");
+      setIsEditing(false);
+      setIsMediaFullscreen(false);
     }
   }, [post]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsMediaFullscreen(false);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -97,20 +130,19 @@ export default function PostDetails({
       const userIdValue =
         typeof post.userId === "string" ? post.userId : post.userId?._id;
 
-      // Nếu không có userId, không fetch
       if (!userIdValue) return;
 
-      // Kiểm tra xem đã có profilePicture đầy đủ chưa
       const currentUser =
         post.user || (typeof post.userId === "object" ? post.userId : null);
-      const hasProfilePicture = currentUser?.profilePicture;
 
-      // Nếu đã có profilePicture, không cần fetch
-      if (hasProfilePicture) {
+      const hasCompleteUser =
+        currentUser?.username && currentUser?.profilePicture;
+
+      if (hasCompleteUser) {
+        setUserProfile(null);
         return;
       }
 
-      // Fetch user profile nếu thiếu profilePicture
       try {
         const token =
           localStorage.getItem("token") || localStorage.getItem("access_token");
@@ -402,26 +434,116 @@ export default function PostDetails({
     }
   };
 
+  const isPostOwner = (): boolean => {
+    if (!post || !currentUserId) return false;
+    const postUserId = typeof post.userId === "string" ? post.userId : post.userId?._id;
+    const postUser = post.user?._id;
+    return postUserId === currentUserId || postUser === currentUserId;
+  };
+
+  const handleEditPost = async () => {
+    if (!post || !editCaption.trim()) return;
+
+    const previousEditing = isEditing;
+    setIsEditing(true);
+    try {
+      const token =
+        localStorage.getItem("token") || localStorage.getItem("access_token");
+      if (!token) {
+        setIsEditing(previousEditing);
+        return;
+      }
+
+      await httpsRequest.patch(`/api/posts/${post._id}`, {
+        caption: editCaption.trim(),
+      });
+
+      if (onPostUpdate) {
+        onPostUpdate({
+          ...post,
+          caption: editCaption.trim(),
+        });
+      }
+      setIsEditing(false);
+    } catch (err: unknown) {
+      const axiosError = err as {
+        response?: { status?: number; data?: TAuthError };
+      };
+
+      if (axiosError.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("user");
+        navigate("/login", { replace: true });
+        return;
+      }
+      console.error("Failed to edit post:", err);
+      setIsEditing(previousEditing);
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!post || isDeleting) return;
+
+    if (!confirm("Are you sure you want to delete this post?")) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const token =
+        localStorage.getItem("token") || localStorage.getItem("access_token");
+      if (!token) return;
+
+      await httpsRequest.delete(`/api/posts/${post._id}`);
+
+      if (onPostUpdate) {
+        onPostUpdate({
+          ...post,
+          _id: "",
+        });
+      }
+      onOpenChange(false);
+    } catch (err: unknown) {
+      const axiosError = err as {
+        response?: { status?: number; data?: TAuthError };
+      };
+
+      if (axiosError.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        localStorage.removeItem("user");
+        navigate("/login", { replace: true });
+        return;
+      }
+      console.error("Failed to delete post:", err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (!post) return null;
 
-  // Merge user data: ưu tiên post.user, nhưng nếu thiếu profilePicture thì dùng userProfile
-  let user =
-    post.user ||
-    userProfile ||
-    (typeof post.userId === "object" ? post.userId : null);
+  let user = post.user || userProfile || (typeof post.userId === "object" ? post.userId : null);
 
-  // Nếu post.user có nhưng thiếu profilePicture, merge với userProfile
-  if (post.user && !post.user.profilePicture && userProfile) {
+  if (post.user && userProfile) {
     user = {
       ...post.user,
-      profilePicture: userProfile.profilePicture,
+      username: userProfile.username || post.user.username,
+      fullName: userProfile.fullName || post.user.fullName,
+      profilePicture: userProfile.profilePicture || post.user.profilePicture,
     };
-  }
-
-  // Nếu vẫn chưa có user, dùng userProfile hoặc post.userId
-  if (!user) {
-    user =
-      userProfile || (typeof post.userId === "object" ? post.userId : null);
+  } else if (!user && userProfile) {
+    user = userProfile;
+  } else if (!user && typeof post.userId === "object" && post.userId) {
+    user = {
+      _id: post.userId._id,
+      username: post.userId.username,
+      fullName: post.userId.fullName,
+      profilePicture: post.userId.profilePicture,
+    };
   }
 
   const profilePictureUrl = user?.profilePicture
@@ -436,18 +558,20 @@ export default function PostDetails({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-5xl max-w-[90vw] max-h-[90vh] p-0 border-border rounded-lg overflow-hidden bg-card"
+        className="sm:max-w-7xl max-w-[95vw] max-h-[95vh] p-0 border-border rounded-lg overflow-hidden bg-card"
         style={{ backgroundColor: "hsl(var(--card))" }}
+        showCloseButton={false}
       >
-        <div className="flex h-[90vh]">
+        <div className="flex h-[95vh]">
           {/* Left side - Media */}
-          <div className="flex-1 bg-black flex items-center justify-center w-full h-full">
+          <div className="flex-1 bg-card flex items-center justify-center w-full h-full relative">
             {post.mediaType === "video" ? (
               <video
                 src={postImageUrl}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain cursor-zoom-in"
                 controls
                 playsInline
+                onClick={() => setIsMediaFullscreen(true)}
                 onError={(e) => {
                   const target = e.target as HTMLVideoElement;
                   target.style.display = "none";
@@ -457,7 +581,8 @@ export default function PostDetails({
               <img
                 src={postImageUrl}
                 alt={post.caption || ""}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain cursor-zoom-in"
+                onClick={() => setIsMediaFullscreen(true)}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = "none";
@@ -467,9 +592,9 @@ export default function PostDetails({
           </div>
 
           {/* Right side - Details */}
-          <div className="w-[400px] flex flex-col bg-background border-l border-border">
+          <div className="w-[500px] flex flex-col bg-background border-l border-border">
             {/* Header */}
-            <div className="p-4 border-b border-border flex items-center">
+            <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div className="relative h-10 w-10 shrink-0">
                   {profilePictureUrl && (
@@ -489,9 +614,8 @@ export default function PostDetails({
                     />
                   )}
                   <div
-                    className={`avatar-fallback h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center ${
-                      profilePictureUrl ? "hidden" : "flex"
-                    }`}
+                    className={`avatar-fallback h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center ${profilePictureUrl ? "hidden" : "flex"
+                      }`}
                   >
                     <span className="text-white text-sm font-bold">
                       {userInitial}
@@ -512,17 +636,84 @@ export default function PostDetails({
                   )}
                 </div>
               </div>
+              {isPostOwner() && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="p-1 hover:bg-accent rounded-full transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="h-5 w-5 text-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsEditing(true);
+                      }}
+                      disabled={isEditing || isDeleting}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePost();
+                      }}
+                      disabled={isDeleting || isEditing}
+                      variant="destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
 
             {/* Comments Section */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Caption */}
-              <div className="flex items-start gap-2">
-                <span className="font-semibold text-sm">{username}</span>
-                {post.caption && (
-                  <span className="text-sm flex-1">{post.caption}</span>
-                )}
-              </div>
+              {isEditing ? (
+                <div className="flex flex-col gap-2">
+                  <Textarea
+                    value={editCaption}
+                    onChange={(e) => setEditCaption(e.target.value)}
+                    className="min-h-[80px] resize-none text-sm"
+                    placeholder="Edit caption..."
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={handleEditPost}
+                      disabled={!editCaption.trim()}
+                      size="sm"
+                      className="bg-blue-500 text-white hover:bg-blue-600"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditCaption(post.caption || "");
+                      }}
+                      disabled={isEditing}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2">
+                  <span className="font-semibold text-sm">{username}</span>
+                  {post.caption && (
+                    <span className="text-sm flex-1">{post.caption}</span>
+                  )}
+                </div>
+              )}
 
               {/* Comments List */}
               {isLoadingComments ? (
@@ -695,6 +886,43 @@ export default function PostDetails({
           </div>
         </div>
       </DialogContent>
+
+      {isMediaFullscreen && (
+        <Dialog open={isMediaFullscreen} onOpenChange={setIsMediaFullscreen}>
+          <DialogContent
+            className="max-w-[95vw] max-h-[95vh] p-0 border-border bg-card/95"
+            showCloseButton={true}
+          >
+            <div className="relative w-full h-full flex items-center justify-center">
+              {post.mediaType === "video" ? (
+                <video
+                  src={postImageUrl}
+                  className="max-w-full max-h-[95vh] object-contain"
+                  controls
+                  autoPlay
+                  playsInline
+                  onClick={(e) => e.stopPropagation()}
+                  onError={(e) => {
+                    const target = e.target as HTMLVideoElement;
+                    target.style.display = "none";
+                  }}
+                />
+              ) : (
+                <img
+                  src={postImageUrl}
+                  alt={post.caption || ""}
+                  className="max-w-full max-h-[95vh] object-contain"
+                  onClick={() => setIsMediaFullscreen(false)}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = "none";
+                  }}
+                />
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }

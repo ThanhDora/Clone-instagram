@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useNavigation } from "@/Context/NavigationContext";
 import {
   Sheet,
   SheetContent,
@@ -25,6 +26,7 @@ import type {
 export default function SearchSheet() {
   const { isOpen, closeSheet } = useSearchSheet();
   const navigate = useNavigate();
+  const { setIsNavigating } = useNavigation();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<TSearchUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -33,25 +35,33 @@ export default function SearchSheet() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
-    }, 500); // 500ms debounce
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch search results from API
   useEffect(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
     const fetchSearchResults = async () => {
       const trimmedQuery = debouncedQuery.trim();
 
       if (!trimmedQuery) {
         setSearchResults([]);
         setIsSearching(false);
+        setError(null);
         return;
       }
+
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
 
       setIsSearching(true);
       setError(null);
@@ -62,24 +72,30 @@ export default function SearchSheet() {
           {
             params: {
               q: trimmedQuery,
+              limit: 50,
             },
+            signal: abortController.signal,
           }
         );
+
+        if (abortController.signal.aborted) return;
+
         if (response.data?.data) {
           setSearchResults(response.data.data);
         } else {
           setSearchResults([]);
         }
       } catch (err: unknown) {
+        if (abortController.signal.aborted) return;
+
         const axiosError = err as {
           response?: { status?: number; data?: TAuthError };
+          message?: string;
         };
-
-        console.error("Search error:", err);
 
         if (axiosError.response?.status === 401) {
           setError("Please login to search");
-        } else {
+        } else if (axiosError.message !== "canceled") {
           const errorData: TAuthError = axiosError.response?.data || {
             message: "Failed to search users",
           };
@@ -87,11 +103,19 @@ export default function SearchSheet() {
         }
         setSearchResults([]);
       } finally {
-        setIsSearching(false);
+        if (!abortController.signal.aborted) {
+          setIsSearching(false);
+        }
       }
     };
 
     fetchSearchResults();
+
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [debouncedQuery]);
 
   const fetchSearchHistory = useCallback(async () => {
@@ -138,6 +162,10 @@ export default function SearchSheet() {
       setDebouncedQuery("");
       setSearchResults([]);
       setError(null);
+      setIsSearching(false);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
     }
   }, [isOpen]);
 
@@ -166,18 +194,29 @@ export default function SearchSheet() {
   );
 
   const handleUserClick = useCallback(
-    (userId: string, username?: string) => {
+    async (userId: string, username?: string) => {
       if (searchQuery.trim() && username) {
         saveSearchHistory(userId, searchQuery.trim());
       }
-      if (username) {
-        navigate(`/profile/${username}`);
-      } else {
-        navigate(`/profile/${userId}`);
+      setIsNavigating(true);
+      try {
+        await import("@/Page/UserProfile");
+        if (username) {
+          navigate(`/profile/${username}`);
+        } else {
+          navigate(`/profile/${userId}`);
+        }
+      } catch (error) {
+        console.error("Failed to preload profile:", error);
+        if (username) {
+          navigate(`/profile/${username}`);
+        } else {
+          navigate(`/profile/${userId}`);
+        }
       }
       closeSheet();
     },
-    [navigate, closeSheet, searchQuery, saveSearchHistory]
+    [navigate, closeSheet, searchQuery, saveSearchHistory, setIsNavigating]
   );
 
   const handleDeleteHistoryItem = useCallback(
@@ -205,7 +244,7 @@ export default function SearchSheet() {
   }, []);
 
   const handleHistoryItemClick = useCallback(
-    (item: TSearchHistoryItem) => {
+    async (item: TSearchHistoryItem) => {
       let username: string | null = null;
 
       if (item.searchedUser) {
@@ -221,14 +260,20 @@ export default function SearchSheet() {
       }
 
       if (username) {
-        setSearchQuery(item.searchQuery);
-        navigate(`/profile/${username}`);
+        setIsNavigating(true);
+        try {
+          await import("@/Page/UserProfile");
+          navigate(`/profile/${username}`);
+        } catch (error) {
+          console.error("Failed to preload profile:", error);
+          navigate(`/profile/${username}`);
+        }
         closeSheet();
       } else {
         setSearchQuery(item.searchQuery);
       }
     },
-    [navigate, closeSheet]
+    [navigate, closeSheet, setIsNavigating]
   );
 
   return (
@@ -327,9 +372,8 @@ export default function SearchSheet() {
                                   />
                                 ) : null}
                                 <div
-                                  className={`h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold ${
-                                    avatarUrl ? "hidden" : ""
-                                  }`}
+                                  className={`h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold ${avatarUrl ? "hidden" : ""
+                                    }`}
                                 >
                                   {initial}
                                 </div>
@@ -404,9 +448,8 @@ export default function SearchSheet() {
                         />
                       ) : null}
                       <div
-                        className={`h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold ${
-                          avatarUrl ? "hidden" : ""
-                        }`}
+                        className={`h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold ${avatarUrl ? "hidden" : ""
+                          }`}
                       >
                         {initial}
                       </div>

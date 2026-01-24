@@ -1,4 +1,7 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
+import { useNavigation } from "@/Context/NavigationContext";
+import { useSocket } from "@/Context/SocketContext";
 import { Avatar, AvatarImage, AvatarFallback } from "@/Components/ui/avatar";
 import { Input } from "@/Components/ui/input";
 import { Button } from "@/Components/ui/button";
@@ -14,6 +17,8 @@ import {
 import type {
   TConversation,
   TConversationsResponse,
+  TCreateConversationRequest,
+  TCreateConversationResponse,
 } from "@/Type/Conversation";
 import type {
   TMessage,
@@ -21,7 +26,7 @@ import type {
   TSendTextMessageRequest,
   TSendMessageResponse,
 } from "@/Type/Message";
-import type { TGetProfileResponse, TUser } from "@/Type/Users";
+import type { TGetProfileResponse, TUser, TSearchUsersResponse } from "@/Type/Users";
 import Switch from "@/Components/Switch";
 import httpsRequest from "@/utils/httpsRequest";
 
@@ -52,9 +57,13 @@ function formatMessageTime(timestamp: string): string {
 }
 
 export default function Messages() {
+  const location = useLocation();
+  const { setIsNavigating } = useNavigation();
+  const { socket, isConnected } = useSocket();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [selectedConversation, setSelectedConversation] = useState<
     string | null
-  >(null);
+  >((location.state as { conversationId?: string })?.conversationId || null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSwitchOpen, setIsSwitchOpen] = useState(false);
   const [messageInput, setMessageInput] = useState("");
@@ -64,6 +73,15 @@ export default function Messages() {
   const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [followedUsers, setFollowedUsers] = useState<Array<{
+    _id: string;
+    username: string;
+    fullName?: string;
+    profilePicture?: string;
+  }>>([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
 
   const fetchCurrentUser = useCallback(async () => {
     try {
@@ -100,28 +118,117 @@ export default function Messages() {
       console.error("Failed to fetch conversations:", err);
     } finally {
       setIsLoadingConversations(false);
+      setIsNavigating(false);
     }
-  }, []);
+  }, [setIsNavigating]);
 
-  const fetchMessages = useCallback(async (conversationId: string) => {
-    setIsLoadingMessages(true);
+  const searchFollowedUsers = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setFollowedUsers([]);
+      return;
+    }
+
+    setIsSearchingUsers(true);
     try {
-      const response = await httpsRequest.get<TMessagesResponse>(
-        `/api/messages/conversations/${conversationId}/messages`,
+      const response = await httpsRequest.get<TSearchUsersResponse>(
+        "/api/users/search",
         {
           params: {
-            page: 1,
-            limit: 50,
+            q: query,
+            limit: 20,
           },
         }
       );
-      setMessages(response.data.data.messages);
+
+      const searchResults = response.data.data || [];
+      const followedUsersResults = searchResults.filter((user) => {
+        const hasConversation = conversations.some((conv) =>
+          conv.participants.some((p) => p._id === user._id)
+        );
+        return !hasConversation && user._id !== currentUser?._id;
+      });
+
+      setFollowedUsers(followedUsersResults);
     } catch (err) {
-      console.error("Failed to fetch messages:", err);
+      console.error("Failed to search users:", err);
+      setFollowedUsers([]);
     } finally {
-      setIsLoadingMessages(false);
+      setIsSearchingUsers(false);
     }
-  }, []);
+  }, [conversations, currentUser]);
+
+  const handleCreateConversation = useCallback(async (userId: string) => {
+    try {
+      const response = await httpsRequest.post<TCreateConversationResponse>(
+        "/api/messages/conversations",
+        {
+          userId,
+        } as TCreateConversationRequest
+      );
+
+      await fetchConversations();
+      setSelectedConversation(response.data.data._id);
+      setSearchQuery("");
+      setFollowedUsers([]);
+    } catch (err) {
+      console.error("Failed to create conversation:", err);
+    }
+  }, [fetchConversations]);
+
+  const fetchMessages = useCallback(
+    async (conversationId: string, currentPage = 1, append = false) => {
+      setIsLoadingMessages(true);
+      try {
+        const response = await httpsRequest.get<TMessagesResponse>(
+          `/api/messages/conversations/${conversationId}/messages`,
+          {
+            params: {
+              page: currentPage,
+              limit: 50,
+            },
+          }
+        );
+        const newMessages = response.data.data.messages;
+        setHasMoreMessages(response.data.data.pagination.hasMore);
+        if (append) {
+          setMessages((prev) => [...newMessages, ...prev]);
+        } else {
+          setMessages(newMessages);
+        }
+        setPage(currentPage);
+      } catch (err) {
+        console.error("Failed to fetch messages:", err);
+      } finally {
+        setIsLoadingMessages(false);
+      }
+    },
+    []
+  );
+
+  const markMessagesAsRead = useCallback(
+    async (conversationId: string) => {
+      try {
+        await httpsRequest.put(
+          `/api/messages/conversations/${conversationId}/read`
+        );
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv._id === conversationId
+              ? { ...conv, unreadCount: 0 }
+              : conv
+          )
+        );
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.conversationId === conversationId ? { ...msg, isRead: true } : msg
+          )
+        );
+      } catch (err) {
+        console.error("Failed to mark messages as read:", err);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     fetchCurrentUser();
@@ -129,10 +236,128 @@ export default function Messages() {
   }, [fetchCurrentUser, fetchConversations]);
 
   useEffect(() => {
-    if (selectedConversation) {
-      fetchMessages(selectedConversation);
+    const debounceTimer = setTimeout(() => {
+      if (searchQuery.trim()) {
+        searchFollowedUsers(searchQuery);
+      } else {
+        setFollowedUsers([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery, searchFollowedUsers]);
+
+  useEffect(() => {
+    const conversationIdFromState = (location.state as { conversationId?: string })?.conversationId;
+    if (conversationIdFromState && conversations.length > 0) {
+      const exists = conversations.some((c) => c._id === conversationIdFromState);
+      if (exists && selectedConversation !== conversationIdFromState) {
+        setSelectedConversation(conversationIdFromState);
+      }
     }
-  }, [selectedConversation, fetchMessages]);
+  }, [location.state, conversations, selectedConversation]);
+
+  useEffect(() => {
+    if (selectedConversation && socket && isConnected) {
+      socket.emit("join_conversation", { conversationId: selectedConversation });
+    }
+
+    return () => {
+      if (selectedConversation && socket && isConnected) {
+        socket.emit("leave_conversation", {
+          conversationId: selectedConversation,
+        });
+      }
+    };
+  }, [selectedConversation, socket, isConnected]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      setPage(1);
+      setHasMoreMessages(true);
+      fetchMessages(selectedConversation, 1, false);
+      markMessagesAsRead(selectedConversation);
+    }
+  }, [selectedConversation, fetchMessages, markMessagesAsRead]);
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleNewMessage = (message: TMessage) => {
+      if (message.conversationId === selectedConversation) {
+        setMessages((prev) => {
+          const exists = prev.some((m) => m._id === message._id);
+          if (exists) return prev;
+          return [...prev, message];
+        });
+        markMessagesAsRead(message.conversationId);
+      }
+
+      setConversations((prev) => {
+        const convIndex = prev.findIndex(
+          (c) => c._id === message.conversationId
+        );
+        if (convIndex === -1) {
+          fetchConversations();
+          return prev;
+        }
+
+        const updated = [...prev];
+        updated[convIndex] = {
+          ...updated[convIndex],
+          lastMessage: {
+            _id: message._id,
+            messageType: message.messageType,
+            content: message.content,
+            imageUrl: message.imageUrl,
+            createdAt: message.createdAt,
+            senderId:
+              typeof message.senderId === "string"
+                ? message.senderId
+                : message.senderId._id,
+            isRead: message.isRead,
+          },
+          lastMessageAt: message.createdAt,
+          unreadCount:
+            message.conversationId === selectedConversation
+              ? 0
+              : updated[convIndex].unreadCount + 1,
+        };
+
+        const [selectedConv] = updated.splice(convIndex, 1);
+        return [selectedConv, ...updated];
+      });
+    };
+
+    const handleMessageRead = (data: {
+      conversationId: string;
+      messageIds: string[];
+    }) => {
+      if (data.conversationId === selectedConversation) {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            data.messageIds.includes(msg._id)
+              ? { ...msg, isRead: true }
+              : msg
+          )
+        );
+      }
+    };
+
+    socket.on("new_message", handleNewMessage);
+    socket.on("message_read", handleMessageRead);
+
+    return () => {
+      socket.off("new_message", handleNewMessage);
+      socket.off("message_read", handleMessageRead);
+    };
+  }, [socket, isConnected, selectedConversation, fetchConversations, markMessagesAsRead]);
 
   const conversationsWithUsers = useMemo(() => {
     if (!currentUser) return [];
@@ -148,24 +373,24 @@ export default function Messages() {
         id: conv._id,
         otherUser: otherUser
           ? {
-              id: otherUser._id,
-              username: otherUser.username,
-              fullName: otherUser.fullName || "",
-              avatar: otherUser.profilePicture,
-              isActive: false,
-              lastActive: "",
-            }
+            id: otherUser._id,
+            username: otherUser.username,
+            fullName: otherUser.fullName || "",
+            avatar: otherUser.profilePicture,
+            isActive: false,
+            lastActive: "",
+          }
           : undefined,
         lastMessage: lastMessage
           ? {
-              id: lastMessage._id,
-              conversationId: conv._id,
-              senderId: lastMessage.senderId,
-              receiverId: otherUser?._id || "",
-              text: lastMessage.content || lastMessage.imageUrl || "",
-              timestamp: formatTimeAgo(lastMessage.createdAt),
-              isRead: lastMessage.isRead,
-            }
+            id: lastMessage._id,
+            conversationId: conv._id,
+            senderId: lastMessage.senderId,
+            receiverId: otherUser?._id || "",
+            text: lastMessage.content || lastMessage.imageUrl || "",
+            timestamp: formatTimeAgo(lastMessage.createdAt),
+            isRead: lastMessage.isRead,
+          }
           : undefined,
         unreadCount: conv.unreadCount,
       };
@@ -227,8 +452,20 @@ export default function Messages() {
       );
 
       const newMessage = response.data.data;
-      setMessages((prev) => [...prev, newMessage]);
+      setMessages((prev) => {
+        const exists = prev.some((m) => m._id === newMessage._id);
+        if (exists) return prev;
+        return [...prev, newMessage];
+      });
       setMessageInput("");
+
+      if (socket && isConnected) {
+        socket.emit("send_message", {
+          conversationId: selectedConversation,
+          message: newMessage,
+        });
+      }
+
       await fetchConversations();
     } catch (err) {
       console.error("Failed to send message:", err);
@@ -236,6 +473,12 @@ export default function Messages() {
       setIsSendingMessage(false);
     }
   };
+
+  const loadMoreMessages = useCallback(() => {
+    if (selectedConversation && hasMoreMessages && !isLoadingMessages) {
+      fetchMessages(selectedConversation, page + 1, true);
+    }
+  }, [selectedConversation, hasMoreMessages, isLoadingMessages, page, fetchMessages]);
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -300,9 +543,8 @@ export default function Messages() {
                 />
               ) : null}
               <div
-                className={`h-12 w-12 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold ${
-                  currentUser?.profilePicture ? "hidden" : ""
-                }`}
+                className={`h-12 w-12 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold ${currentUser?.profilePicture ? "hidden" : ""
+                  }`}
               >
                 {currentUser?.username?.[0]?.toUpperCase() || "U"}
               </div>
@@ -328,69 +570,123 @@ export default function Messages() {
               <div className="px-4 py-8 text-center text-muted-foreground">
                 <p className="text-sm">Loading conversations...</p>
               </div>
-            ) : filteredConversations.length > 0 ? (
-              filteredConversations.map((conv) => {
-                const lastMessage = conv.lastMessage;
-                const isFromCurrentUser =
-                  lastMessage?.senderId === currentUser?._id;
-                const previewText = lastMessage
-                  ? isFromCurrentUser
-                    ? `You: ${lastMessage.text}`
-                    : lastMessage.text
-                  : "No messages yet";
-                const timeDisplay = lastMessage
-                  ? formatTimeAgo(conv.lastMessageAt)
-                  : "";
-
-                return (
-                  <div
-                    key={conv.id}
-                    onClick={() => setSelectedConversation(conv.id)}
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors",
-                      selectedConversation === conv.id
-                        ? "bg-muted/50"
-                        : "hover:bg-muted/30"
-                    )}
-                  >
-                    <div className="relative shrink-0">
-                      <Avatar className="h-12 w-12">
-                        {conv.otherUser?.avatar && (
-                          <AvatarImage
-                            src={getImageUrl(conv.otherUser.avatar)}
-                            alt={conv.otherUser.username}
-                          />
-                        )}
-                        <AvatarFallback className="bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
-                          {conv.otherUser?.username?.[0]?.toUpperCase() || "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      {conv.otherUser?.isActive && (
-                        <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-card rounded-full" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-semibold text-foreground truncate">
-                          {conv.otherUser?.username || "Unknown"}
-                        </p>
-                        {timeDisplay && (
-                          <span className="text-xs text-muted-foreground shrink-0 ml-2">
-                            {timeDisplay}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {previewText}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })
             ) : (
-              <div className="px-4 py-8 text-center text-muted-foreground">
-                <p className="text-sm">No conversations found</p>
-              </div>
+              <>
+                {filteredConversations.length > 0 && (
+                  <>
+                    {filteredConversations.map((conv) => {
+                      const lastMessage = conv.lastMessage;
+                      const isFromCurrentUser =
+                        lastMessage?.senderId === currentUser?._id;
+                      const previewText = lastMessage
+                        ? isFromCurrentUser
+                          ? `You: ${lastMessage.text}`
+                          : lastMessage.text
+                        : "No messages yet";
+                      const timeDisplay = lastMessage
+                        ? formatTimeAgo(conv.lastMessageAt)
+                        : "";
+
+                      return (
+                        <div
+                          key={conv.id}
+                          onClick={() => setSelectedConversation(conv.id)}
+                          className={cn(
+                            "flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors",
+                            selectedConversation === conv.id
+                              ? "bg-muted/50"
+                              : "hover:bg-muted/30"
+                          )}
+                        >
+                          <div className="relative shrink-0">
+                            <Avatar className="h-12 w-12">
+                              {conv.otherUser?.avatar && (
+                                <AvatarImage
+                                  src={getImageUrl(conv.otherUser.avatar)}
+                                  alt={conv.otherUser.username}
+                                />
+                              )}
+                              <AvatarFallback className="bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
+                                {conv.otherUser?.username?.[0]?.toUpperCase() || "U"}
+                              </AvatarFallback>
+                            </Avatar>
+                            {conv.otherUser?.isActive && (
+                              <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-card rounded-full" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-semibold text-foreground truncate">
+                                {conv.otherUser?.username || "Unknown"}
+                              </p>
+                              {timeDisplay && (
+                                <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                                  {timeDisplay}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {previewText}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+                {searchQuery.trim() && followedUsers.length > 0 && (
+                  <div className="px-4 py-2 border-t border-border">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                      People
+                    </p>
+                    {followedUsers.map((user) => (
+                      <div
+                        key={user._id}
+                        onClick={() => handleCreateConversation(user._id)}
+                        className="flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-muted/30"
+                      >
+                        <div className="relative shrink-0">
+                          <Avatar className="h-12 w-12">
+                            {user.profilePicture && (
+                              <AvatarImage
+                                src={getImageUrl(user.profilePicture)}
+                                alt={user.username}
+                              />
+                            )}
+                            <AvatarFallback className="bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
+                              {user.username?.[0]?.toUpperCase() || "U"}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">
+                            {user.username || "Unknown"}
+                          </p>
+                          {user.fullName && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {user.fullName}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!isLoadingConversations &&
+                  filteredConversations.length === 0 &&
+                  (!searchQuery.trim() || followedUsers.length === 0) && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      <p className="text-sm">No conversations found</p>
+                    </div>
+                  )}
+                {searchQuery.trim() &&
+                  isSearchingUsers &&
+                  followedUsers.length === 0 && (
+                    <div className="px-4 py-8 text-center text-muted-foreground">
+                      <p className="text-sm">Searching...</p>
+                    </div>
+                  )}
+              </>
             )}
           </div>
         </div>
@@ -436,8 +732,16 @@ export default function Messages() {
                 </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              {isLoadingMessages ? (
+            <div
+              className="flex-1 overflow-y-auto p-4"
+              onScroll={(e) => {
+                const target = e.currentTarget;
+                if (target.scrollTop === 0 && hasMoreMessages) {
+                  loadMoreMessages();
+                }
+              }}
+            >
+              {isLoadingMessages && messages.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                   <p className="text-sm text-muted-foreground">
                     Loading messages...
@@ -445,6 +749,17 @@ export default function Messages() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
+                  {hasMoreMessages && (
+                    <div className="flex justify-center py-2">
+                      <button
+                        onClick={loadMoreMessages}
+                        disabled={isLoadingMessages}
+                        className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
+                      >
+                        {isLoadingMessages ? "Loading..." : "Load more"}
+                      </button>
+                    </div>
+                  )}
                   {currentMessages.map((message) => {
                     return (
                       <div
@@ -471,14 +786,11 @@ export default function Messages() {
                           </Avatar>
                         )}
                         <div
-                          className={cn(
-                            "max-w-[70%] rounded-lg px-4 py-2",
-                            message.isFromCurrentUser
-                              ? "bg-blue-500"
-                              : "bg-gray-400"
-                          )}
+                          className="max-w-[70%] rounded-lg px-4 py-2"
                         >
-                          <p className="text-sm p-2 rounded-lg">
+                          <p className={cn("text-sm p-2 rounded-lg", message.isFromCurrentUser
+                            ? "bg-blue-500"
+                            : "bg-gray-400")}>
                             {message.text}
                           </p>
                           <p
@@ -495,6 +807,7 @@ export default function Messages() {
                       </div>
                     );
                   })}
+                  <div ref={messagesEndRef} />
                 </div>
               )}
             </div>
@@ -531,7 +844,7 @@ export default function Messages() {
             <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
               Send private photos and messages to a friend or group.
             </p>
-            <Button className="bg-(--primary) hover:bg-(--primary)/90 cursor-pointer">
+            <Button className="bg-gray-700 rounded-full hover:bg-gray-600 cursor-pointer">
               <Send className="h-5 w-5" />
               Send message
             </Button>

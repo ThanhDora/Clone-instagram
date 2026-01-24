@@ -6,6 +6,7 @@ import {
   useParams,
   useSearchParams,
 } from "react-router-dom";
+import { useNavigation } from "@/Context/NavigationContext";
 import {
   Heart,
   MessageCircle,
@@ -47,6 +48,7 @@ export default function Home() {
   const navigate = useNavigate();
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { setIsNavigating } = useNavigation();
   const postIdFromUrl = params.postId;
   const editPostIdFromUrl = searchParams.get("edit");
 
@@ -67,6 +69,8 @@ export default function Home() {
   const [editCaption, setEditCaption] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [isPostDetailsOpen, setIsPostDetailsOpen] = useState(false);
 
   const baseURL =
     import.meta.env.VITE_BASE_URL || "https://instagram.f8team.dev";
@@ -180,10 +184,11 @@ export default function Home() {
           setIsLoadingMore(false);
         } else {
           setIsLoading(false);
+          setIsNavigating(false);
         }
       }
     },
-    [navigate, limit]
+    [navigate, limit, setIsNavigating]
   );
 
   useEffect(() => {
@@ -199,7 +204,16 @@ export default function Home() {
     fetchFeedPosts(0, false);
   }, [fetchFeedPosts]);
 
-  // Sync URL params with state for edit dialog
+  useEffect(() => {
+    if (postIdFromUrl && !editPostIdFromUrl && posts.length > 0) {
+      const post = posts.find((p) => p._id === postIdFromUrl);
+      if (post && !selectedPost) {
+        setSelectedPost(post);
+        setIsPostDetailsOpen(true);
+      }
+    }
+  }, [postIdFromUrl, editPostIdFromUrl, posts, selectedPost]);
+
   useEffect(() => {
     if (editPostIdFromUrl && postIdFromUrl) {
       const post = posts.find((p) => p._id === postIdFromUrl);
@@ -588,9 +602,8 @@ export default function Home() {
                         />
                       )}
                       <div
-                        className={`avatar-fallback h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center ${
-                          profilePictureUrl ? "hidden" : "flex"
-                        }`}
+                        className={`avatar-fallback h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center ${profilePictureUrl ? "hidden" : "flex"
+                          }`}
                       >
                         <span className="text-white text-sm font-bold">
                           {userInitial}
@@ -643,7 +656,13 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="relative w-full bg-black">
+                <div
+                  className="relative w-full bg-black cursor-pointer"
+                  onClick={() => {
+                    setSelectedPost(post);
+                    setIsPostDetailsOpen(true);
+                  }}
+                >
                   {post.mediaType === "video" ? (
                     <video
                       src={postImageUrl}
@@ -693,7 +712,8 @@ export default function Home() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
-                            navigate(`/post/${post._id}`);
+                            setSelectedPost(post);
+                            setIsPostDetailsOpen(true);
                           }}
                           className="hover:opacity-70"
                         >
@@ -702,7 +722,8 @@ export default function Home() {
                         {post.comments > 0 && (
                           <button
                             onClick={() => {
-                              navigate(`/post/${post._id}`);
+                              setSelectedPost(post);
+                              setIsPostDetailsOpen(true);
                             }}
                             className="text-sm font-semibold hover:opacity-70"
                           >
@@ -739,7 +760,13 @@ export default function Home() {
                     </div>
 
                     {post.comments > 0 && (
-                      <button className="text-sm text-muted-foreground hover:text-foreground">
+                      <button
+                        onClick={() => {
+                          setSelectedPost(post);
+                          setIsPostDetailsOpen(true);
+                        }}
+                        className="text-sm text-muted-foreground hover:text-foreground"
+                      >
                         View all {post.comments}{" "}
                         {post.comments === 1 ? "comment" : "comments"}
                       </button>
@@ -813,14 +840,14 @@ export default function Home() {
         </Dialog>
       )}
 
-      {/* PostDetails - controlled by URL */}
-      {postIdFromUrl && !editPostIdFromUrl && (
+      {(isPostDetailsOpen || (postIdFromUrl && !editPostIdFromUrl)) && (
         <PostDetails
-          post={posts.find((p) => p._id === postIdFromUrl) || null}
-          isOpen={!!postIdFromUrl}
+          post={selectedPost || (postIdFromUrl && !editPostIdFromUrl ? posts.find((p) => p._id === postIdFromUrl) || null : null)}
+          isOpen={isPostDetailsOpen || (!!postIdFromUrl && !editPostIdFromUrl)}
           onOpenChange={(open) => {
+            setIsPostDetailsOpen(open);
             if (!open) {
-              navigate(-1);
+              setSelectedPost(null);
             }
           }}
           onPostUpdate={(updatedPost) => {

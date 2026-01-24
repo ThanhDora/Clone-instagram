@@ -5,6 +5,7 @@ import { CreateDialogProvider } from "@/Context/CreateDialogContext";
 import { NotificationsSheetProvider } from "@/Context/NotificationsSheetContext";
 import { SearchSheetProvider } from "@/Context/SearchSheetContext";
 import { SocketProvider } from "@/Context/SocketContext";
+import { NavigationProvider } from "@/Context/NavigationContext";
 import MainLayout from "./Layout/MainLayout";
 import Login from "./Features/Auth/Login";
 import Register from "./Features/Auth/Register";
@@ -12,6 +13,7 @@ import VerifyEmail from "./Features/Auth/VerifyEmail";
 import GoogleCallback from "./Features/Auth/GoogleCallback";
 import ProtectedRoute from "./Components/ProtectedRoute";
 import Loading from "./Components/Loading";
+import NavigationOverlay from "./Components/NavigationOverlay";
 
 const Home = lazy(() => import("./Page/Home"));
 const SearchSheet = lazy(() => import("./Page/Search"));
@@ -22,6 +24,7 @@ const Messages = lazy(() => import("./Page/Messages"));
 const CreateDialog = lazy(() => import("./Page/Create"));
 const UserProfile = lazy(() => import("./Page/UserProfile"));
 const EditProfile = lazy(() => import("./Page/EditProfile"));
+const Follow = lazy(() => import("./Page/Follow"));
 // import ProtectedRoute from "./Components/ProtectedRoute";
 
 export default function App() {
@@ -31,9 +34,11 @@ export default function App() {
         <CreateDialogProvider>
           <NotificationsSheetProvider>
             <SearchSheetProvider>
-              <BrowserRouter>
-                <Loading />
-                <Routes>
+              <NavigationProvider>
+                <BrowserRouter>
+                  <Loading />
+                  <NavigationOverlay />
+                  <Routes>
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route
@@ -115,6 +120,38 @@ export default function App() {
                         </Suspense>
                       }
                     />
+                    <Route
+                      path="/followers/:username?"
+                      element={
+                        <Suspense fallback={<Loading />}>
+                          <Follow />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/followers"
+                      element={
+                        <Suspense fallback={<Loading />}>
+                          <Follow />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/following/:username?"
+                      element={
+                        <Suspense fallback={<Loading />}>
+                          <Follow />
+                        </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/following"
+                      element={
+                        <Suspense fallback={<Loading />}>
+                          <Follow />
+                        </Suspense>
+                      }
+                    />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
@@ -123,7 +160,8 @@ export default function App() {
                   <NotificationsSheet />
                   <SearchSheet />
                 </Suspense>
-              </BrowserRouter>
+                </BrowserRouter>
+              </NavigationProvider>
             </SearchSheetProvider>
           </NotificationsSheetProvider>
         </CreateDialogProvider>

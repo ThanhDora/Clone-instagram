@@ -54,11 +54,13 @@ function formatMessageTime(timestamp: string): string {
 interface MessagesSheetProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  initialConversationId?: string | null;
 }
 
 export default function MessagesSheet({
   isOpen,
   onOpenChange,
+  initialConversationId,
 }: MessagesSheetProps) {
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -137,8 +139,13 @@ export default function MessagesSheet({
     if (isOpen) {
       fetchCurrentUser();
       fetchConversations();
+      if (initialConversationId) {
+        setSelectedConversation(initialConversationId);
+      }
+    } else {
+      setSelectedConversation(null);
     }
-  }, [isOpen, fetchCurrentUser, fetchConversations]);
+  }, [isOpen, fetchCurrentUser, fetchConversations, initialConversationId]);
 
   useEffect(() => {
     if (selectedConversation) {
@@ -150,34 +157,43 @@ export default function MessagesSheet({
     if (!currentUser) return [];
 
     return conversations.map((conv) => {
-      const otherUser = conv.participants.find(
+      const otherParticipants = conv.participants.filter(
         (p) => p._id !== currentUser._id
       );
+      const otherUser = otherParticipants[0];
       const lastMessage = conv.lastMessage;
+      const isGroupChat = otherParticipants.length > 1;
 
       return {
         ...conv,
         id: conv._id,
         otherUser: otherUser
           ? {
-              id: otherUser._id,
-              username: otherUser.username,
-              fullName: otherUser.fullName || "",
-              avatar: otherUser.profilePicture,
-              isActive: false,
-              lastActive: "",
-            }
+            id: otherUser._id,
+            username: otherUser.username,
+            fullName: otherUser.fullName || "",
+            avatar: otherUser.profilePicture,
+            isActive: false,
+            lastActive: "",
+          }
           : undefined,
+        allParticipants: otherParticipants.map((p) => ({
+          id: p._id,
+          username: p.username,
+          fullName: p.fullName || "",
+          avatar: p.profilePicture,
+        })),
+        isGroupChat,
         lastMessage: lastMessage
           ? {
-              id: lastMessage._id,
-              conversationId: conv._id,
-              senderId: lastMessage.senderId,
-              receiverId: otherUser?._id || "",
-              text: lastMessage.content || lastMessage.imageUrl || "",
-              timestamp: formatTimeAgo(lastMessage.createdAt),
-              isRead: lastMessage.isRead,
-            }
+            id: lastMessage._id,
+            conversationId: conv._id,
+            senderId: lastMessage.senderId,
+            receiverId: otherUser?._id || "",
+            text: lastMessage.content || lastMessage.imageUrl || "",
+            timestamp: formatTimeAgo(lastMessage.createdAt),
+            isRead: lastMessage.isRead,
+          }
           : undefined,
         unreadCount: conv.unreadCount,
       };
@@ -277,7 +293,7 @@ export default function MessagesSheet({
         )}
         showCloseButton={true}
       >
-        <SheetHeader className="px-4 pt-4 pb-2 border-b border-border">
+        <SheetHeader className="px-4 pt-4 pb-2 border-b border-border relative">
           {selectedConversation ? (
             <div className="flex items-center gap-3">
               <button
@@ -286,19 +302,85 @@ export default function MessagesSheet({
               >
                 <ArrowLeft className="h-5 w-5 text-foreground" />
               </button>
-              <Avatar className="h-8 w-8">
-                {selectedConv?.otherUser?.avatar && (
-                  <AvatarImage
-                    src={getImageUrl(selectedConv.otherUser.avatar)}
-                    alt={selectedConv.otherUser.username}
-                  />
-                )}
-                <AvatarFallback>
-                  {selectedConv?.otherUser?.username?.[0]?.toUpperCase() || "U"}
-                </AvatarFallback>
-              </Avatar>
+              <button
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate("/messages", {
+                    state: { conversationId: selectedConversation },
+                  });
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded transition-colors"
+              >
+                <SquareArrowOutUpRight className="h-5 w-5 text-foreground" />
+              </button>
+              {selectedConv?.isGroupChat && selectedConv.allParticipants.length > 1 ? (
+                <div className="relative h-8 w-8">
+                  {selectedConv.allParticipants.slice(0, 4).map((participant, index) => {
+                    const position = index === 0 ? "top-0 left-0" :
+                      index === 1 ? "top-0 right-0" :
+                        index === 2 ? "bottom-0 left-0" :
+                          "bottom-0 right-0";
+                    const size = selectedConv.allParticipants.length === 2 ? "h-4 w-4" :
+                      selectedConv.allParticipants.length === 3 ? "h-3.5 w-3.5" :
+                        "h-3.5 w-3.5";
+                    const avatarUrl = getImageUrl(participant.avatar);
+
+                    return (
+                      <div
+                        key={participant.id}
+                        className={`absolute ${position} ${size} rounded-full overflow-hidden border border-card`}
+                      >
+                        {avatarUrl ? (
+                          <img
+                            src={avatarUrl}
+                            alt={participant.username}
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = "none";
+                              const fallback = target.nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = "flex";
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className={`h-full w-full rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-[8px] font-semibold ${avatarUrl ? "hidden" : "flex"}`}
+                        >
+                          {participant.username?.[0]?.toUpperCase() || "U"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="relative h-8 w-8">
+                  {selectedConv?.otherUser?.avatar ? (
+                    <img
+                      src={getImageUrl(selectedConv.otherUser.avatar)}
+                      alt={selectedConv.otherUser.username}
+                      className="h-8 w-8 rounded-full object-cover border border-border"
+                      crossOrigin="anonymous"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = "flex";
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    className={`h-8 w-8 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-semibold ${selectedConv?.otherUser?.avatar ? "hidden" : "flex"}`}
+                  >
+                    {selectedConv?.otherUser?.username?.[0]?.toUpperCase() || "U"}
+                  </div>
+                </div>
+              )}
               <SheetTitle className="text-left text-lg font-semibold flex-1">
-                {selectedConv?.otherUser?.username || "Unknown"}
+                {selectedConv?.isGroupChat
+                  ? selectedConv.allParticipants
+                    .map((p) => p.username)
+                    .join(", ")
+                  : selectedConv?.otherUser?.username || "Unknown"}
               </SheetTitle>
             </div>
           ) : (
@@ -355,14 +437,13 @@ export default function MessagesSheet({
                           </Avatar>
                         )}
                         <div
-                          className={cn(
-                            "max-w-[70%] rounded-lg px-4 py-2",
-                            message.isFromCurrentUser
-                              ? "bg-blue-500"
-                              : "bg-gray-400"
-                          )}
+                          className="max-w-[70%] rounded-lg px-4 py-2"
                         >
-                          <p className="text-sm">{message.text}</p>
+                          <p className={cn("text-sm p-2 rounded-lg", message.isFromCurrentUser
+                            ? "bg-blue-500"
+                            : "bg-gray-400")}>
+                            {message.text}
+                          </p>
                           <p
                             className={cn(
                               "text-xs mt-1",
@@ -445,26 +526,83 @@ export default function MessagesSheet({
                         )}
                       >
                         <div className="relative shrink-0">
-                          <Avatar className="h-12 w-12">
-                            {conv.otherUser?.avatar && (
-                              <AvatarImage
-                                src={getImageUrl(conv.otherUser.avatar)}
-                                alt={conv.otherUser.username}
-                              />
-                            )}
-                            <AvatarFallback>
-                              {conv.otherUser?.username?.[0]?.toUpperCase() ||
-                                "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          {conv.otherUser?.isActive && (
-                            <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-card rounded-full" />
+                          {conv.isGroupChat && conv.allParticipants.length > 1 ? (
+                            <div className="relative h-12 w-12">
+                              {conv.allParticipants.slice(0, 4).map((participant, index) => {
+                                const position = index === 0 ? "top-0 left-0" :
+                                  index === 1 ? "top-0 right-0" :
+                                    index === 2 ? "bottom-0 left-0" :
+                                      "bottom-0 right-0";
+                                const size = conv.allParticipants.length === 2 ? "h-6 w-6" :
+                                  conv.allParticipants.length === 3 ? "h-5 w-5" :
+                                    "h-5 w-5";
+                                const avatarUrl = getImageUrl(participant.avatar);
+
+                                return (
+                                  <div
+                                    key={participant.id}
+                                    className={`absolute ${position} ${size} rounded-full overflow-hidden border border-card`}
+                                  >
+                                    {avatarUrl ? (
+                                      <img
+                                        src={avatarUrl}
+                                        alt={participant.username}
+                                        className="h-full w-full object-cover"
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement;
+                                          target.style.display = "none";
+                                          const fallback = target.nextElementSibling as HTMLElement;
+                                          if (fallback) fallback.style.display = "flex";
+                                        }}
+                                      />
+                                    ) : null}
+                                    <div
+                                      className={`h-full w-full rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-semibold ${avatarUrl ? "hidden" : "flex"}`}
+                                    >
+                                      {participant.username?.[0]?.toUpperCase() || "U"}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="relative h-12 w-12">
+                                {conv.otherUser?.avatar ? (
+                                  <img
+                                    src={getImageUrl(conv.otherUser.avatar)}
+                                    alt={conv.otherUser.username}
+                                    className="h-12 w-12 rounded-full object-cover border border-border"
+                                    crossOrigin="anonymous"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      target.style.display = "none";
+                                      const fallback = target.nextElementSibling as HTMLElement;
+                                      if (fallback) fallback.style.display = "flex";
+                                    }}
+                                  />
+                                ) : null}
+                                <div
+                                  className={`h-12 w-12 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold ${conv.otherUser?.avatar ? "hidden" : "flex"}`}
+                                >
+                                  {conv.otherUser?.username?.[0]?.toUpperCase() ||
+                                    "U"}
+                                </div>
+                                {conv.otherUser?.isActive && (
+                                  <div className="absolute bottom-0 right-0 h-3 w-3 bg-green-500 border-2 border-card rounded-full" />
+                                )}
+                              </div>
+                            </>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
                             <p className="text-sm font-semibold text-foreground truncate">
-                              {conv.otherUser?.username || "Unknown"}
+                              {conv.isGroupChat
+                                ? conv.allParticipants
+                                  .map((p) => p.username)
+                                  .join(", ")
+                                : conv.otherUser?.username || "Unknown"}
                             </p>
                             {timeDisplay && (
                               <span className="text-xs text-muted-foreground shrink-0 ml-2">

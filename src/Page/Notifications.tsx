@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Sheet,
   SheetContent,
@@ -7,6 +8,7 @@ import {
   SheetTitle,
 } from "@/Components/ui/sheet";
 import { useNotificationsSheet } from "@/Context/NotificationsSheetContext";
+import { useSocket } from "@/Context/SocketContext";
 import { cn, getImageUrl } from "@/lib/utils";
 import httpsRequest from "@/utils/httpsRequest";
 import type { TNotificationsResponse, TNotification } from "@/Type/Notification";
@@ -29,25 +31,28 @@ function formatTimeAgo(timestamp: string): string {
 }
 
 function getNotificationText(notification: TNotification): string {
-  const username = notification.userId.username;
   switch (notification.type) {
     case "like":
-      return `${username} liked your photo`;
+      return "liked your photo";
     case "comment":
       return notification.content
-        ? `${username} commented: ${notification.content}`
-        : `${username} commented on your photo`;
+        ? `commented: ${notification.content}`
+        : "commented on your photo";
     case "follow":
-      return `${username} started following you`;
+      return "started following you";
     case "mention":
-      return `${username} mentioned you in a comment`;
+      return "mentioned you in a comment";
+    case "post":
+      return "posted a new photo";
     default:
-      return `${username} interacted with your post`;
+      return "interacted with your post";
   }
 }
 
 export default function NotificationsSheet() {
   const { isOpen, closeSheet } = useNotificationsSheet();
+  const { socket, isConnected } = useSocket();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<TNotification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -63,9 +68,37 @@ export default function NotificationsSheet() {
           },
         }
       );
-      setNotifications(response.data.data.notifications);
+      console.log("Notifications: Fetched from API", response.data);
+
+      let notificationsData: TNotification[] = [];
+
+      if (response.data?.data) {
+        if (response.data.data.notifications && Array.isArray(response.data.data.notifications)) {
+          notificationsData = response.data.data.notifications;
+        } else if (Array.isArray(response.data.data)) {
+          notificationsData = response.data.data;
+        } else if (Array.isArray(response.data)) {
+          notificationsData = response.data;
+        }
+      }
+
+      if (notificationsData.length > 0) {
+        setNotifications(notificationsData);
+        console.log("Notifications: Set notifications", notificationsData.length);
+      } else {
+        console.log("Notifications: No notifications in response");
+        setNotifications([]);
+      }
     } catch (err) {
-      console.error("Failed to fetch notifications:", err);
+      console.error("Notifications: Failed to fetch notifications:", err);
+      const axiosError = err as {
+        response?: { status?: number; data?: unknown };
+        message?: string;
+      };
+      if (axiosError.response?.status === 401) {
+        console.log("Notifications: Unauthorized, user may need to login");
+      }
+      setNotifications([]);
     } finally {
       setIsLoading(false);
     }
@@ -74,8 +107,102 @@ export default function NotificationsSheet() {
   useEffect(() => {
     if (isOpen) {
       fetchNotifications();
+      const interval = setInterval(() => {
+        fetchNotifications();
+      }, 5000);
+      return () => clearInterval(interval);
     }
   }, [isOpen, fetchNotifications]);
+
+  useEffect(() => {
+    if (!socket || !isConnected) {
+      console.log("Notifications: Socket not connected", { socket: !!socket, isConnected });
+      return;
+    }
+
+    console.log("Notifications: Setting up socket listeners");
+
+    const handleNewNotification = (notification: TNotification) => {
+      console.log("Notifications: Received new notification", notification);
+      setNotifications((prev) => {
+        const exists = prev.some((n) => n._id === notification._id);
+        if (exists) {
+          console.log("Notifications: Notification already exists, skipping");
+          return prev;
+        }
+        console.log("Notifications: Adding new notification to list");
+        return [notification, ...prev];
+      });
+    };
+
+    const handleLikeNotification = (data: { notification: TNotification }) => {
+      console.log("Notifications: Received like notification", data);
+      if (data.notification) {
+        handleNewNotification(data.notification);
+      }
+    };
+
+    const handleCommentNotification = (data: { notification: TNotification }) => {
+      console.log("Notifications: Received comment notification", data);
+      if (data.notification) {
+        handleNewNotification(data.notification);
+      }
+    };
+
+    const handleFollowNotification = (data: { notification: TNotification }) => {
+      console.log("Notifications: Received follow notification", data);
+      if (data.notification) {
+        handleNewNotification(data.notification);
+      }
+    };
+
+    socket.on("new_notification", handleNewNotification);
+    socket.on("notification", handleNewNotification);
+    socket.on("like_notification", handleLikeNotification);
+    socket.on("comment_notification", handleCommentNotification);
+    socket.on("follow_notification", handleFollowNotification);
+
+    socket.onAny((eventName, ...args) => {
+      if (eventName.includes("notification") || eventName.includes("like") || eventName.includes("comment") || eventName.includes("follow")) {
+        console.log("Notifications: Received socket event", eventName, args);
+      }
+    });
+
+    return () => {
+      socket.off("new_notification", handleNewNotification);
+      socket.off("notification", handleNewNotification);
+      socket.off("like_notification", handleLikeNotification);
+      socket.off("comment_notification", handleCommentNotification);
+      socket.off("follow_notification", handleFollowNotification);
+      socket.offAny();
+    };
+  }, [socket, isConnected]);
+
+  const handleNotificationClick = useCallback(
+    async (notification: TNotification) => {
+      if (!notification.isRead) {
+        try {
+          await httpsRequest.put(`/api/notifications/${notification._id}/read`);
+          setNotifications((prev) =>
+            prev.map((n) =>
+              n._id === notification._id ? { ...n, isRead: true } : n
+            )
+          );
+        } catch (err) {
+          console.error("Failed to mark notification as read:", err);
+        }
+      }
+
+      if (notification.relatedPostId) {
+        navigate(`/post/${notification.relatedPostId}`);
+        closeSheet();
+      } else if (notification.userId?._id) {
+        navigate(`/profile/${notification.userId.username}`);
+        closeSheet();
+      }
+    },
+    [navigate, closeSheet]
+  );
 
   return (
     <Sheet open={isOpen} onOpenChange={closeSheet}>
@@ -109,22 +236,32 @@ export default function NotificationsSheet() {
               notifications.map((notification) => (
                 <div
                   key={notification._id}
+                  onClick={() => handleNotificationClick(notification)}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer",
                     !notification.isRead && "bg-muted/30"
                   )}
                 >
-                  <div className="shrink-0">
-                    <img
-                      src={getImageUrl(notification.userId.profilePicture)}
-                      alt={notification.userId.username}
-                      className="h-10 w-10 rounded-full object-cover aspect-square"
-                      crossOrigin="anonymous"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = "none";
-                      }}
-                    />
+                  <div className="shrink-0 relative">
+                    {notification.userId.profilePicture ? (
+                      <img
+                        src={getImageUrl(notification.userId.profilePicture)}
+                        alt={notification.userId.username}
+                        className="h-10 w-10 rounded-full object-cover aspect-square"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                          const fallback = target.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = "flex";
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      className={`h-10 w-10 rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold ${notification.userId.profilePicture ? "hidden" : "flex"}`}
+                    >
+                      {notification.userId.username?.[0]?.toUpperCase() || "U"}
+                    </div>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-foreground">

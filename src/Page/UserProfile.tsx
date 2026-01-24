@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigation } from "@/Context/NavigationContext";
 import {
   Settings,
   Grid3x3,
@@ -15,8 +16,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/Components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/Components/ui/tabs";
 import Footer from "@/Components/Footer";
-import AllLinks from "@/Components/dialog-standard-3";
 import { FaThreads } from "react-icons/fa6";
+import PostDetails from "@/Components/PostDetails";
+import MessagesSheet from "@/Page/MessagesSheet";
+import Follow from "@/Page/Follow";
 import httpsRequest from "@/utils/httpsRequest";
 import type {
   TGetProfileResponse,
@@ -24,10 +27,17 @@ import type {
   TAuthError,
 } from "@/Type/Users";
 import type { TGetUserPostsResponse, Post } from "@/Type/Post";
+import type {
+  TConversationsResponse,
+  TCreateConversationRequest,
+  TCreateConversationResponse,
+} from "@/Type/Conversation";
 
 export default function UserProfile() {
   const navigate = useNavigate();
   const { username: usernameFromUrl } = useParams<{ username?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { setIsNavigating } = useNavigation();
   const [showFullBio, setShowFullBio] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const bioRef = useRef<HTMLParagraphElement>(null);
@@ -44,6 +54,10 @@ export default function UserProfile() {
   const [currentUserUsername, setCurrentUserUsername] = useState<string | null>(
     null
   );
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [isPostDetailsOpen, setIsPostDetailsOpen] = useState(false);
+  const [isMessagesSheetOpen, setIsMessagesSheetOpen] = useState(false);
+  const [messagesSheetConversationId, setMessagesSheetConversationId] = useState<string | null>(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem("user");
@@ -183,10 +197,11 @@ export default function UserProfile() {
       } finally {
         if (!skipLoading) {
           setIsLoading(false);
+          setIsNavigating(false);
         }
       }
     },
-    [usernameFromUrl, isViewingOwnProfile, navigate]
+    [usernameFromUrl, isViewingOwnProfile, navigate, setIsNavigating]
   );
 
   const fetchUserPosts = useCallback(
@@ -404,6 +419,47 @@ export default function UserProfile() {
     }
   };
 
+  const handleMessageClick = async () => {
+    if (!userData) return;
+
+    try {
+      const conversationsResponse =
+        await httpsRequest.get<TConversationsResponse>(
+          "/api/messages/conversations",
+          {
+            params: {
+              page: 1,
+              limit: 100,
+            },
+          }
+        );
+
+      const existingConversation = conversationsResponse.data.data.conversations.find(
+        (conv) => conv.participants.some((p) => p._id === userData._id)
+      );
+
+      if (existingConversation) {
+        setMessagesSheetConversationId(existingConversation._id);
+        setIsMessagesSheetOpen(true);
+      } else {
+        const createResponse =
+          await httpsRequest.post<TCreateConversationResponse>(
+            "/api/messages/conversations",
+            {
+              userId: userData._id,
+            } as TCreateConversationRequest
+          );
+
+        setMessagesSheetConversationId(createResponse.data.data._id);
+        setIsMessagesSheetOpen(true);
+      }
+    } catch (err) {
+      console.error("Failed to open conversation:", err);
+      setIsMessagesSheetOpen(true);
+      setMessagesSheetConversationId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -470,7 +526,7 @@ export default function UserProfile() {
 
   const profilePicture = getImageUrl(
     userData.profilePicture ||
-      ("avatar" in userData ? userData.avatar : undefined)
+    ("avatar" in userData ? userData.avatar : undefined)
   );
   const username = userData.username || "";
   const fullName = userData.fullName || "";
@@ -495,9 +551,8 @@ export default function UserProfile() {
             />
           ) : null}
           <div
-            className={`h-[200px] w-[200px] rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center ${
-              profilePicture ? "hidden" : ""
-            }`}
+            className={`h-[200px] w-[200px] rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center ${profilePicture ? "hidden" : ""
+              }`}
           >
             <span className="text-white text-6xl font-bold">
               {username.charAt(0).toUpperCase() || "U"}
@@ -516,29 +571,36 @@ export default function UserProfile() {
                 <span className="font-medium">{postsCount}</span>
                 <span className="text-sm text-muted-foreground">Posts</span>
               </div>
-              <Link
-                to={`/followers${usernameFromUrl ? `/${usernameFromUrl}` : ""}`}
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.set("modal", "followers");
+                  setSearchParams(params);
+                }}
                 className="flex items-center gap-1"
               >
                 <span className="font-medium">{followersCount}</span>
                 <span className="text-sm text-muted-foreground">Followers</span>
-              </Link>
-              <Link
-                to={`/following${usernameFromUrl ? `/${usernameFromUrl}` : ""}`}
+              </button>
+              <button
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams);
+                  params.set("modal", "following");
+                  setSearchParams(params);
+                }}
                 className="flex items-center gap-1"
               >
                 <span className="font-medium">{followingCount}</span>
                 <span className="text-sm text-muted-foreground">Following</span>
-              </Link>
+              </button>
             </div>
 
             {bio && (
               <div className="max-w-md">
                 <p
                   ref={bioRef}
-                  className={`text-sm text-muted-foreground wrap-break-word whitespace-normal ${
-                    !showFullBio ? "line-clamp-3" : ""
-                  }`}
+                  className={`text-sm text-muted-foreground wrap-break-word whitespace-normal ${!showFullBio ? "line-clamp-3" : ""
+                    }`}
                 >
                   "{bio}"
                 </p>
@@ -566,7 +628,7 @@ export default function UserProfile() {
                   </Link>
                 </div>
               )}
-              <div className="flex items-center gap-1">
+              {/* <div className="flex items-center gap-1">
                 <Link
                   to="/links"
                   className="text-sm text-primary hover:underline flex items-center gap-1"
@@ -575,16 +637,22 @@ export default function UserProfile() {
                   <span className="font-bold">Thanhdora.com</span>
                 </Link>
                 <AllLinks />
-              </div>
-              <Link
-                to="https://www.threads.com/@lee.thanh_dev_?xmt=AQF0Aqry2tJEhko-XOUWxBiAbR4POSsB8Hor6zm46F379tA"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-primary hover:underline flex items-center gap-1"
-              >
-                <FaThreads className="h-5 w-5 text-primary" />
-                <span className="font-bold">lee.thanh_dev_</span>
-              </Link>
+              </div> */}
+              {(() => {
+                const displayUsername = userData?.username || usernameFromUrl || currentUserUsername || "";
+                if (!displayUsername) return null;
+                return (
+                  <Link
+                    to={`https://www.threads.com/@${displayUsername}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline flex items-center gap-1"
+                  >
+                    <FaThreads className="h-5 w-5 text-primary" />
+                    <span className="font-bold">{displayUsername}</span>
+                  </Link>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -616,12 +684,13 @@ export default function UserProfile() {
               {isFollowingLoading
                 ? "Loading..."
                 : isFollowing
-                ? "Unfollow"
-                : "Follow"}
+                  ? "Unfollow"
+                  : "Follow"}
             </Button>
             <Button
               variant="outline"
               className="w-60 h-13 border-none shadow-none bg-gray-400 hover:bg-gray-600 text-white rounded-2xl cursor-pointer"
+              onClick={handleMessageClick}
             >
               Message
             </Button>
@@ -679,6 +748,19 @@ export default function UserProfile() {
                       <div
                         key={post._id}
                         className="aspect-square relative cursor-pointer group"
+                        onClick={() => {
+                          const enrichedPost: Post = {
+                            ...post,
+                            user: post.user || (userData ? {
+                              _id: userData._id,
+                              username: userData.username,
+                              fullName: userData.fullName,
+                              profilePicture: userData.profilePicture || (("avatar" in userData && userData.avatar) ? userData.avatar : undefined),
+                            } : undefined),
+                          };
+                          setSelectedPost(enrichedPost);
+                          setIsPostDetailsOpen(true);
+                        }}
                       >
                         {post.mediaType === "video" ? (
                           <video
@@ -760,6 +842,19 @@ export default function UserProfile() {
                         <div
                           key={post._id}
                           className="aspect-square relative cursor-pointer group"
+                          onClick={() => {
+                            const enrichedPost: Post = {
+                              ...post,
+                              user: post.user || (userData ? {
+                                _id: userData._id,
+                                username: userData.username,
+                                fullName: userData.fullName,
+                                profilePicture: userData.profilePicture || (("avatar" in userData && userData.avatar) ? userData.avatar : undefined),
+                              } : undefined),
+                            };
+                            setSelectedPost(enrichedPost);
+                            setIsPostDetailsOpen(true);
+                          }}
                         >
                           {post.mediaType === "video" ? (
                             <video
@@ -814,6 +909,47 @@ export default function UserProfile() {
         </div>
       </div>
       <Footer />
+      <PostDetails
+        post={selectedPost}
+        isOpen={isPostDetailsOpen}
+        onOpenChange={(open) => {
+          setIsPostDetailsOpen(open);
+          if (!open) {
+            setSelectedPost(null);
+          }
+        }}
+        onPostUpdate={(updatedPost) => {
+          setPosts((prev) =>
+            prev.map((post) =>
+              post._id === updatedPost._id ? updatedPost : post
+            )
+          );
+        }}
+      />
+      <MessagesSheet
+        isOpen={isMessagesSheetOpen}
+        onOpenChange={(open) => {
+          setIsMessagesSheetOpen(open);
+          if (!open) {
+            setMessagesSheetConversationId(null);
+          }
+        }}
+        initialConversationId={messagesSheetConversationId}
+      />
+      {searchParams.get("modal") && (
+        <Follow
+          username={usernameFromUrl}
+          userId={userData?._id}
+          isOpen={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              const params = new URLSearchParams(searchParams);
+              params.delete("modal");
+              setSearchParams(params);
+            }
+          }}
+        />
+      )}
     </>
   );
 }
