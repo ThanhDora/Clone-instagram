@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const baseURL = import.meta.env.VITE_BASE_URL || "https://instagram.f8team.dev";
+const baseURL = import.meta.env.VITE_BASE_URL;
 
 const httpsRequest = axios.create({
   baseURL,

@@ -73,7 +73,7 @@ export default function Home() {
   const [isPostDetailsOpen, setIsPostDetailsOpen] = useState(false);
 
   const baseURL =
-    import.meta.env.VITE_BASE_URL || "https://instagram.f8team.dev";
+    import.meta.env.VITE_BASE_URL;
 
   const getImageUrl = (url: string | undefined | null): string => {
     if (!url || url.trim() === "") return "";

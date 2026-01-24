@@ -22,7 +22,7 @@ export default function Story() {
   } | null>(null);
 
   const baseURL =
-    import.meta.env.VITE_BASE_URL || "https://instagram.f8team.dev";
+    import.meta.env.VITE_BASE_URL;
 
   const getImageUrl = (url: string | undefined | null): string => {
     if (!url || url.trim() === "") return "";
@@ -119,9 +119,8 @@ export default function Story() {
                 />
               ) : null}
               <div
-                className={`h-full w-full rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center ${
-                  currentUser.profilePicture ? "hidden" : "flex"
-                }`}
+                className={`h-full w-full rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center ${currentUser.profilePicture ? "hidden" : "flex"
+                  }`}
               >
                 <span className="text-white text-2xl font-bold">
                   {currentUser.username.charAt(0).toUpperCase() || "U"}
@@ -148,11 +147,10 @@ export default function Story() {
             className="flex flex-col items-center gap-2 min-w-[80px] cursor-pointer shrink-0"
           >
             <div
-              className={`relative ring-2 rounded-full p-1 ${
-                story.isViewed
-                  ? "ring-border"
-                  : "ring-gradient-to-r from-purple-500 via-pink-500 to-orange-500"
-              }`}
+              className={`relative ring-2 rounded-full p-1 ${story.isViewed
+                ? "ring-border"
+                : "ring-gradient-to-r from-purple-500 via-pink-500 to-orange-500"
+                }`}
             >
               <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center overflow-hidden">
                 {avatarUrl ? (
@@ -169,9 +167,8 @@ export default function Story() {
                   />
                 ) : null}
                 <div
-                  className={`h-full w-full rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center ${
-                    avatarUrl ? "hidden" : "flex"
-                  }`}
+                  className={`h-full w-full rounded-full bg-linear-to-br from-blue-400 to-purple-500 flex items-center justify-center ${avatarUrl ? "hidden" : "flex"
+                    }`}
                 >
                   <span className="text-white text-2xl font-bold">
                     {userInitial}

@@ -43,7 +43,7 @@ export default function NavigationLink({
     }
 
     const targetPath = typeof to === "string" ? to : to.pathname || "";
-    
+
     if (targetPath && !targetPath.startsWith("http")) {
       e.preventDefault();
       setIsNavigating(true);

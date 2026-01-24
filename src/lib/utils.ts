@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const baseURL = import.meta.env.VITE_BASE_URL || "https://instagram.f8team.dev";
+const baseURL = import.meta.env.VITE_BASE_URL;
 
 export function getImageUrl(url: string | undefined | null): string {
   if (!url || url.trim() === "") {

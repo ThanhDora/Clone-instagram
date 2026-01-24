@@ -46,7 +46,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     console.log("Connecting to socket server...");
 
     const socketUrl =
-      import.meta.env.VITE_WS_URL || "https://instagram.f8team.dev";
+      import.meta.env.VITE_WS_URL;
     console.log("Socket URL:", socketUrl);
     console.log("Token available:", !!token);
     console.log("Token length:", token?.length || 0);

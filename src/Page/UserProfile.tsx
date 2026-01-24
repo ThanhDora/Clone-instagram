@@ -516,7 +516,7 @@ export default function UserProfile() {
   );
 
   const baseURL =
-    import.meta.env.VITE_BASE_URL || "https://instagram.f8team.dev";
+    import.meta.env.VITE_BASE_URL;
   const getImageUrl = (url: string | undefined | null): string => {
     if (!url || url.trim() === "") return "";
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
@@ -731,8 +731,7 @@ export default function UserProfile() {
                   {posts.map((post) => {
                     const imageUrl = post.image || post.video || "";
                     const baseURL =
-                      import.meta.env.VITE_BASE_URL ||
-                      "https://instagram.f8team.dev";
+                      import.meta.env.VITE_BASE_URL;
                     const getPostImageUrl = (url: string): string => {
                       if (!url || url.trim() === "") return "";
                       if (
@@ -825,8 +824,7 @@ export default function UserProfile() {
                     {posts.map((post) => {
                       const imageUrl = post.image || post.video || "";
                       const baseURL =
-                        import.meta.env.VITE_BASE_URL ||
-                        "https://instagram.f8team.dev";
+                        import.meta.env.VITE_BASE_URL;
                       const getPostImageUrl = (url: string): string => {
                         if (!url || url.trim() === "") return "";
                         if (

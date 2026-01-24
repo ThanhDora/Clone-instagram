@@ -69,7 +69,7 @@ const Example = () => {
 
     try {
       const baseURL =
-        import.meta.env.VITE_BASE_URL || "https://instagram.f8team.dev";
+        import.meta.env.VITE_BASE_URL;
       const redirectUri = `${window.location.origin}/auth/google/callback`;
       const googleAuthUrl = `${baseURL}/api/auth/google?redirect_uri=${encodeURIComponent(
         redirectUri
@@ -102,7 +102,7 @@ const Example = () => {
       // Register does NOT return tokens - user must verify email first
       setSuccessMessage(
         response.data.message ||
-          "User registered successfully. Please check your email to verify your account."
+        "User registered successfully. Please check your email to verify your account."
       );
 
       // Clear form
